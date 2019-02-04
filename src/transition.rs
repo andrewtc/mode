@@ -73,6 +73,73 @@ use crate::{AnyModeWrapper, Mode, ModeWrapper};
 /// # }
 /// ```
 /// 
+/// # Why `Transition` functions?
+/// One of the most powerful features of the `Transition` system is that, while transitioning, the current `Mode` is
+/// moved into the `Transition` callback. This allows `Mode` `B`, being produced, to steal pointers and other state from
+/// `Mode` `A`, as opposed to allocating more memory for `B`, copying over state from `A`, and then deallocating `A`.
+/// This won't make much of a difference for small `Mode`s, but for `Mode`s that contain a large amount of state (on the
+/// order of several megabytes or even gigabytes, as is common in UI applications), this can make a huge difference for
+/// both performance and heap memory usage.
+/// 
+/// Instead of having the `get_transition()` function return a callback, the transition system could have been
+/// implemented as a `fn do_transition(self) -> B` function on `Mode`. (This is a little bit of an oversimplification.)
+/// However, having a callback allows `Transition`s to be scheduled in advance and performed later, capturing state from
+/// the calling code, as necessary. This is especially convenient in cases where a `Mode` needs to stay active for a
+/// little longer after a `Transition` is scheduled, e.g. allowing a `Mode`-driven UI system to finish playing a
+/// transition animation or sound effect before swapping in a new `Mode`.
+/// 
+/// ## Example
+/// ```
+/// use mode::*;
+/// 
+/// # trait MyMode {
+/// #     fn update(&mut self) { }
+/// # }
+/// #
+/// struct SomeMode {
+///     queued_transition : Option<Box<Transition<Self>>>
+/// }
+/// 
+/// impl MyMode for SomeMode {
+///     fn update(&mut self) {
+/// #       let some_condition = true;
+///         // ...
+///         if (some_condition) {
+///             // Queue up a transition to be performed later.
+///             self.queued_transition = Some(Box::new(|previous| { SomeOtherMode }))
+///         }
+/// 
+///         // TODO: Continue updating, animating, etc.
+///     }
+/// }
+/// 
+/// impl Mode for SomeMode {
+/// #   type Base = MyMode;
+/// #   fn as_base(&self) -> &Self::Base { self }
+/// #   fn as_base_mut(&mut self) -> &mut Self::Base { self }
+///     // ...
+///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
+/// #       let ready_to_transition = true;
+///         // ...
+///         if ready_to_transition && self.queued_transition.is_some() {
+///             // When we're finally finished updating, return the queued transition.
+///             self.queued_transition.take()
+///         }
+///         else { None } // Returning None will keep the current Mode active.
+///     }
+/// }
+/// #
+/// # struct SomeOtherMode;
+/// # impl MyMode for SomeOtherMode { }
+/// #
+/// # impl Mode for SomeOtherMode {
+/// #     type Base = MyMode;
+/// #     fn as_base(&self) -> &Self::Base { self }
+/// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
+/// #     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None }
+/// # }
+/// ```
+/// 
 pub trait Transition<A>
     where A : Mode + ?Sized
 {
