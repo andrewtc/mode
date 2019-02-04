@@ -1,22 +1,59 @@
-use crate::TransitionFrom;
+use crate::Transition;
 
-/// Represents a state within an `Automaton`.
+/// Trait that represents a state within an `Automaton`.
 /// 
-/// All `Mode`s have an associated type called `Base` that represents the common interface of a certain subset of
-/// `Mode`s. `Mode`s can **only** be used with an `Automaton` that has the same `Base` type, i.e. an `Automaton<Base>`.
+/// Every `Automaton` contains a single `Mode` instance that represents the active state of the state machine. An
+/// `Automaton<Base>` can **only** switch between implementations of `Mode` of the same `Base` type. The `Automaton`
+/// only allows its active `Mode` to be accessed as a `Base` reference, so only functions exposed on the `Base` type are
+/// callable on the `Mode` from outside the `Automaton`.
+/// 
+/// See [`Automaton`](struct.Automaton.html) for more details.
 /// 
 /// # Transitions
 /// `Mode`s can choose to transition to any other `Mode` with the same `Base` type. This is accomplished by returning a
-/// `Transition` from the `get_transition_mut()` function, which will cause the parent `Automaton` to switch to another
-/// `Mode` the next time `perform_transitions()` is called.
+/// `Transition` function from the `get_transition()` function, which will cause the parent `Automaton` to switch to
+/// another `Mode` the next time `perform_transitions()` is called.
 /// 
-/// See [`Transition`](struct.Transition.html) for more details and
+/// See [`Transition`](trait.Transition.html) and
 /// [`Automaton::perform_transitions()`](struct.Automaton.html#method.perform_transitions) for more details.
 /// 
+/// # Usage
+/// ```
+/// use mode::*;
+/// 
+/// trait MyMode {
+///     // TODO: Define some common interface for ModeA and ModeB.
+/// }
+/// 
+/// struct ModeA; // TODO: Add fields.
+/// impl MyMode for ModeA { }
+/// 
+/// impl Mode for ModeA {
+///     type Base = MyMode;
+///     fn as_base(&self) -> &Self::Base { self }
+///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
+///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
+///         // Transition to ModeB. ModeA can swap to ModeB because both share the same Base.
+///         Some(Box::new(|previous : Self| { ModeB }))
+///     }
+/// }
+/// 
+/// struct ModeB; // TODO: Add fields.
+/// impl MyMode for ModeB { }
+/// 
+/// impl Mode for ModeB {
+///     type Base = MyMode;
+///     fn as_base(&self) -> &Self::Base { self }
+///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
+///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None } // None means don't transition.
+/// }
+/// ```
+/// 
 pub trait Mode : 'static {
-    /// Represents the user-facing interface for the `Mode` that will be exposed via the `Automaton`. The `as_base()`
-    /// and `as_base_mut()` functions of this trait return a `Self::Base` reference to the `Mode`, so that the parent
-    /// `Automaton` can allow access to a common subset of functions on the object.
+    /// Represents the user-facing interface for the `Mode` that will be exposed via the `Automaton`. In order to be
+    /// used with an `Automaton`, the `Base` type of the `Mode` **must** match the `Base` type of the `Automaton`. This
+    /// is so that the `Automaton` can provide `get_mode()` and `get_mode_mut()` functions that return a reference to
+    /// the `Mode` as the `Base` type.
     /// 
     type Base : ?Sized;
 
@@ -28,14 +65,12 @@ pub trait Mode : 'static {
     /// 
     fn as_base_mut(&mut self) -> &mut Self::Base;
 
-    /// Every time `perform_transitions()` is called on an `Automaton`, This function will
-    /// be called on the current `Mode` to determine whether it wants another `Mode` to
-    /// become active. If this function returns `None`, the current `Mode` will remain
-    /// active. If it returns a valid `Transition`, however, the `Automaton` will call
-    /// the `Transition` callback on the current `Mode`, consuming it and swapping in
-    /// whatever `Mode` is produced as a result.
+    /// Every time `perform_transitions()` is called on an `Automaton`, This function will be called on the current
+    /// `Mode` to determine whether it wants another `Mode` to become active. If this function returns `None`, the
+    /// current `Mode` will remain active. If it returns a valid `Transition` function, however, the `Automaton` will
+    /// call the function on the active `Mode`, consuming it and swapping in whichever `Mode` is produced as a result.
     /// 
-    /// See [`Transition`](struct.Transition.html) for more details.
+    /// See [`Transition`](trait.Transition.html) for more details.
     /// 
-    fn get_transition(&mut self) -> Option<Box<dyn TransitionFrom<Self>>>;
+    fn get_transition(&mut self) -> Option<Box<Transition<Self>>>;
 }

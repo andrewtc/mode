@@ -29,7 +29,7 @@ pub trait AnyModeWrapper {
 /// **NOTE:** This `struct` mainly exists to allow `Transition`s to be scheduled as `FnOnce(A) -> B` instead of
 /// requiring each user-defined `Mode` to know more about the implementation details of the `Automaton`.
 /// 
-pub struct ModeWrapper<T>
+pub(crate) struct ModeWrapper<T>
     where T : Mode
 {
     mode : Option<T>,
@@ -64,11 +64,11 @@ impl<T> AnyModeWrapper for ModeWrapper<T>
         // Retrieve the desired transition, if any, from the inner Mode.
         match self.mode.as_mut().unwrap().get_transition() {
             None => None,
-            Some(mut transition) => {
+            Some(transition) => {
                 // If a valid Transition was returned, call the Transition callback on the inner Mode and return a new
                 // wrapper around the Mode that was produced.
                 // NOTE: This will move the Mode into the callback, leaving this object empty.
-                transition.try_invoke(self.mode.take().unwrap())
+                Some(transition.invoke(self.mode.take().unwrap()))
             }
         }
     }

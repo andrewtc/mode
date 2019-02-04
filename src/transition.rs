@@ -1,100 +1,100 @@
 use crate::{AnyModeWrapper, Mode, ModeWrapper};
-use std::marker::PhantomData;
 
 /// Trait that defines the call signature for a function that can switch an `Automaton` from one `Mode` (`A`) to
 /// another.
 /// 
-/// See [`Transition`](struct.Transition.html) for more details.
+/// State machines, by definition, are systems that possess multiple states that can be switched in or out in order to
+/// change the behavior of the system. `Automaton`s are no exception. Eventually, the `Automaton` will need to switch
+/// `Mode`s in order to change its behavior.
 /// 
-pub trait TransitionFrom<A>
-    where A : Mode
+/// Rather than requiring the owner of the `Automaton` to check the status of the current `Mode` periodically and swap
+/// in a new state from outside the object when appropriate, the `Automaton` instead delegates this responsibility to
+/// the current `Mode` via the `perform_transitions()` function. Each time this function is called, the `Automaton`
+/// calls `get_transition()` on the current `Mode` to determine whether it is ready to transition to another state. To
+/// do this, the `Mode` may return a callback function of the form `FnOnce(A) -> B`, where `A` is the type of the
+/// currently active `Mode` and `B` is another implementation of `Mode` with the same `Base` type. The `Transition`
+/// trait is automatically implemented on any closure of this form, so that `get_transitions()` can return a boxed
+/// closure instead of some wrapper type.
+/// 
+/// **NOTE:** Although there is rarely a need to do this, it is perfectly valid for a `Transition` function to return
+/// the input `Mode` as a result. This will result in the currently active `Mode` remaining active, even after the
+/// `Transition` function has been called.
+/// 
+/// # Usage
+/// ```
+/// use mode::*;
+/// 
+/// # trait MyMode { }
+/// #
+/// # struct SomeMode;
+/// # impl MyMode for SomeMode { }
+/// # 
+/// impl Mode for SomeMode {
+/// #   type Base = MyMode;
+/// #   fn as_base(&self) -> &Self::Base { self }
+/// #   fn as_base_mut(&mut self) -> &mut Self::Base { self }
+///     // ...
+///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
+/// #       let some_condition = true;
+/// #       let some_other_condition = true;
+///         // ...
+///         if some_condition {
+///             // Returning a Transition function will cause the Automaton to switch the
+///             // current Mode to whatever new Mode is produced by the callback.
+///             Some(Box::new(|previous : Self| { SomeOtherMode }))
+///         }
+///         else if some_other_condition {
+///             // NOTE: The Transition trait allows this function to return closures with
+///             // completely different return types, so long as the parameter types match.
+///             Some(Box::new(|previous : Self| { YetAnotherMode }))
+///         }
+///         else { None } // Returning None will keep the current Mode active.
+///     }
+/// }
+/// #
+/// # struct SomeOtherMode;
+/// # impl MyMode for SomeOtherMode { }
+/// #
+/// # impl Mode for SomeOtherMode {
+/// #     type Base = MyMode;
+/// #     fn as_base(&self) -> &Self::Base { self }
+/// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
+/// #     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None }
+/// # }
+/// #
+/// # struct YetAnotherMode;
+/// # impl MyMode for YetAnotherMode { }
+/// #
+/// # impl Mode for YetAnotherMode {
+/// #     type Base = MyMode;
+/// #     fn as_base(&self) -> &Self::Base { self }
+/// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
+/// #     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None }
+/// # }
+/// ```
+/// 
+pub trait Transition<A>
+    where A : Mode + ?Sized
 {
-    /// Calls the inner transition callback on the specified `Mode`, if it hasn't been called already, consuming `mode`
-    /// and returning a new `ModeWrapper` wrapping the `Mode` to be swapped in. If the callback has been called once
-    /// already, returns `None`.
+    /// Calls the `Transition` function on the specified `Mode`, consuming the `Transition` and the `mode` and returning
+    /// a wrapper around the new `Mode` to be swapped in as active.
     /// 
-    /// **NOTE:** Ideally, this would return a raw `A::Base` object and not a boxed `AnyModeWrapper`, but this isn't
-    /// possible in all situations because `A::Base` is not necessarily a sized type. This may change in the future when
-    /// [unsized rvalues](https://github.com/rust-lang/rust/issues/48055) are stabilized.
+    /// **NOTE:** You should not attempt to implement this function yourself, as the return type makes use of a private
+    /// trait (`AnyModeWrapper`). Ideally, this function would return a `Box<Mode>` in order to abstract away all of the
+    /// implementation details of the `Automaton`. Unfortunately, that isn't possible, in this case, because the `Mode`
+    /// trait cannot be made into an object, and therefore cannot be boxed.
     /// 
-    fn try_invoke(&mut self, mode : A) -> Option<Box<AnyModeWrapper<Base = A::Base>>>;
+    fn invoke(self : Box<Self>, mode : A) -> Box<AnyModeWrapper<Base = A::Base>>;
 }
 
-/// Represents a function that can be called to switch an `Automaton` from one `Mode` (`A`) to another (`B`).
-/// 
-/// `Transition`s are functions that can only be called once, consuming the current `Mode` for an `Automaton` and
-/// allowing it to pass large amounts of state directly to the new `Mode` to be switched in, if desired. `Transition`s
-/// can be created using the `new()` and `boxed()` functions on any closure of the form `FnOnce(A) -> B`. Having the
-/// inner closure consume the current `Mode` has the nice property of allowing `B` to steal pointers from `A` before
-/// `A` is dropped, which can help reduce the spike in memory usage that would otherwise occur as a result of switching
-/// between two `Mode`s that allocate large amounts of memory on the heap.
-/// 
-/// Another advantage of having a closure swap between `Mode`s is that closures created inside of `A` have full access
-/// to `A`'s private functions, private data, and all state declared within the function that defined the callback.
-/// This offers a lot of flexibility by allowing state from any one of these sources to be moved into the `Transition`
-/// callback that is to be called later.
-/// 
-pub struct Transition<A, B, C>
+impl<T, A, B> Transition<A> for T
     where
+        T : FnOnce(A) -> B,
         A : Mode,
         B : Mode<Base = A::Base>,
-        C : FnOnce(A) -> B
 {
-    phantom_a : PhantomData<A>,
-    phantom_b : PhantomData<B>,
-    callback : Option<C>,
-}
-
-impl<A, B, C> Transition<A, B, C>
-    where
-        A : Mode,
-        B : Mode<Base = A::Base>,
-        C : FnOnce(A) -> B
-{
-    /// Creates and returns a new `Transition` from a transition callback.
-    /// 
-    pub fn new(callback : C) -> Self {
-        Self {
-            phantom_a: Default::default(),
-            phantom_b: Default::default(),
-            callback: Some(callback),
-        }
-    }
-
-    /// Creates and returns a new, boxed `Transition` from a transition callback.
-    /// 
-    pub fn boxed(callback : C) -> Box<Self> {
-        Box::new(Self::new(callback))
-    }
-}
-
-impl<A, B, C> TransitionFrom<A> for Transition<A, B, C>
-    where
-        A : Mode,
-        B : Mode<Base = A::Base>,
-        C : FnOnce(A) -> B
-{
-    fn try_invoke(&mut self, mode : A) -> Option<Box<AnyModeWrapper<Base = A::Base>>> {
-        match self.callback.take() {
-            None => None,
-            Some(callback) => {
-                // If the callback hasn't been called already, call it, passing in the Mode to be consumed and returning
-                // a new ModeWrapper wrapping the Mode that was returned.
-                Some(Box::new(ModeWrapper::new((callback)(mode))))
-            }
-        }
-    }
-}
-
-impl<A, B, C> From<C> for Transition<A, B, C>
-    where
-        A : Mode,
-        B : Mode<Base = A::Base>,
-        C : FnOnce(A) -> B
-{
-    /// Converts a transition callback into a `Transition`.
-    /// 
-    fn from(callback : C) -> Self {
-        Self::new(callback)
+    fn invoke(self : Box<Self>, mode : A) -> Box<AnyModeWrapper<Base = A::Base>> {
+        // Call the transition function and wrap the result with a ModeWrapper.
+        Box::new(ModeWrapper::<B>::new((self)(mode)))
     }
 }

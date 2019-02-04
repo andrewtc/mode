@@ -29,10 +29,10 @@ impl Mode for UpMode {
     type Base = CounterMode;
     fn as_base(&self) -> &Self::Base { self }
     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-    fn get_transition(&mut self) -> Option<Box<TransitionFrom<Self>>> {
+    fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
         if self.counter == self.target {
             // If we've reached the target value, start counting down to (roughly) the median value.
-            Some(Transition::boxed(
+            Some(Box::new(
                 |previous : Self| {
                     DownMode {
                         counter: previous.counter,
@@ -62,11 +62,11 @@ impl Mode for DownMode {
     type Base = CounterMode;
     fn as_base(&self) -> &Self::Base { self }
     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-    fn get_transition(&mut self) -> Option<Box<TransitionFrom<Self>>> {
+    fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
         const GOAL : i32 = 10;
         if self.counter == GOAL {
             // When we finally count down to the goal value, end the program by swapping in a "finished" state.
-            Some(Transition::boxed(
+            Some(Box::new(
                 |previous : Self| {
                     FinishedMode {
                         result: previous.counter,
@@ -75,7 +75,7 @@ impl Mode for DownMode {
         }
         else if self.counter == self.target {
             // If we've reached the target value, start counting up to double the counter value.
-            Some(Transition::boxed(
+            Some(Box::new(
                 |previous : Self| {
                     UpMode {
                         counter: previous.counter,
@@ -101,7 +101,7 @@ impl Mode for FinishedMode {
     type Base = CounterMode;
     fn as_base(&self) -> &Self::Base { self }
     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-    fn get_transition(&mut self) -> Option<Box<TransitionFrom<Self>>> {
+    fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
         // We're finished calculating, so we never want to transition.
         None
     }

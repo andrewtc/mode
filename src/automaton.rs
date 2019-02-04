@@ -1,18 +1,17 @@
 use crate::{AnyModeWrapper, Mode, ModeWrapper};
 
-/// Represents a state machine over a set of `Mode`s that implement some common interface `Base`.
+/// Represents a state machine over a set of `Mode`s that can be referenced via some common interface `Base`.
 /// 
 /// The `Automaton` contains a single, active `Mode` that represents the current state of the state machine. The current
 /// `Mode` is accessible via the `borrow_mode()` and `borrow_mode_mut()` functions, which return a `Base` reference. The
 /// `Automaton` also provides a `perform_transitions()` function that should be called at some point in order to allow
-/// it to transition to another active `Mode`, if desired.
+/// the current `Mode` to transition another `Mode` in, if desired.
 /// 
-/// See the [`Mode`](trait.Mode.html) trait and [`get_transition()`](trait.Mode.html#tymethod.get_transition) for more
-/// details.
+/// See [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
 /// 
 /// # The `Base` parameter
 /// 
-/// The `Base` parameter may be either a `trait` (e.g. `Automaton<dyn SomeTraitThatExtendsMode>`) or a concrete type
+/// The `Base` parameter may be either a `trait` (e.g. `Automaton<dyn SomeTrait>`) or a concrete type
 /// (e.g. `Automaton<SomeStructThatImplsMode>`). Given a `trait`, the `Automaton` will be able to swap between **any**
 /// `Mode`s that implement the trait. However, this means that the `Automaton` will **only** allow the inner `Mode` to
 /// be borrowed via a trait reference, implying that **only** functions defined on the trait will be callable.
@@ -25,37 +24,33 @@ use crate::{AnyModeWrapper, Mode, ModeWrapper};
 /// ```
 /// use mode::*;
 /// 
-/// trait MyBase {
-///     fn some_fn(&mut self);
-/// }
+/// # trait MyMode {
+/// #     fn some_fn(&self);
+/// #     fn some_mut_fn(&mut self);
+/// # }
+/// # 
+/// # struct SomeMode;
+/// # impl MyMode for SomeMode {
+/// #     fn some_fn(&self) { println!("some_fn was called"); }
+/// #     fn some_mut_fn(&mut self) { println!("some_mut_fn was called"); }
+/// # }
+/// # 
+/// # impl Mode for SomeMode {
+/// #     type Base = MyMode;
+/// #     fn as_base(&self) -> &Self::Base { self }
+/// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
+/// #     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None }
+/// # }
+/// # 
+/// // Use with_initial_mode() to create the Automaton with an initial state.
+/// let mut automaton = Automaton::with_initial_mode(SomeMode);
 /// 
-/// struct MyMode; // TODO
+/// // To call functions on the inner Mode, use borrow_mode() or borrow_mode_mut();
+/// automaton.borrow_mode().some_fn();
+/// automaton.borrow_mode_mut().some_mut_fn();
 /// 
-/// impl MyBase for MyMode {
-///     fn some_fn(&mut self) { } // TODO
-/// }
-/// 
-/// impl Mode for MyMode {
-///     type Base = MyBase;
-///     fn as_base(&self) -> &Self::Base { self }
-///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<Box<TransitionFrom<Self>>> { None } // TODO
-/// }
-/// 
-/// // TODO: Add more Modes that implement MyBase.
-/// 
-/// fn main() {
-///     let mut automaton = Automaton::with_initial_mode(MyMode);
-/// 
-///     loop {
-///         // Call some update method on the Mode.
-///         automaton.borrow_mode_mut().some_fn();
-/// 
-///         // Allow the Automaton to switch Modes, if desired.
-///         automaton.perform_transitions();
-///         # break;
-///     }
-/// }
+/// // Let the Automaton handle transitions.
+/// automaton.perform_transitions();
 /// ```
 /// 
 pub struct Automaton<Base>
@@ -82,7 +77,8 @@ impl<Base> Automaton<Base>
     /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
     /// `Mode` it returns as a result.
     /// 
-    /// See [`Transition`](struct.Transition.html) for more details.
+    /// See [`Transition`](trait.Transition.html) and
+    /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
     /// 
     pub fn perform_transitions(&mut self) {
         if let Some(mode) = self.current_mode.perform_transitions() {
@@ -109,12 +105,46 @@ impl<Base> Automaton<Base>
 impl<Base> Automaton<Base>
     where Base : Mode<Base = Base> + Default
 {
-    /// Creates a new `Automaton` with the default `Mode` active.
+    /// Creates a new `Automaton` with a default `Mode` instance as the active `Mode`.
     /// 
     /// **NOTE:** This only applies if `Base` is a **concrete** type (e.g. `Automaton<SomeStructThatImplsMode>`) that
     /// implements `Default`. If `Base` is a **trait** type (e.g. `Automaton<dyn SomeTraitThatExtendsMode>`) or you
     /// would otherwise like to specify the initial mode of the created `Automaton`, use
     /// [`with_initial_mode()`](struct.Automaton.html#method.with_initial_mode) instead.
+    /// 
+    /// ```
+    /// use mode::*;
+    /// 
+    /// struct ConcreteMode { count : u32 };
+    /// 
+    /// impl Mode for ConcreteMode {
+    ///     type Base = Self;
+    ///     fn as_base(&self) -> &Self { self }
+    ///     fn as_base_mut(&mut self) -> &mut Self { self }
+    ///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
+    ///         // TODO: Logic for transitioning between states goes here.
+    ///         Some(Box::new(
+    ///             |previous : Self| {
+    ///                 ConcreteMode { count: previous.count + 1 }
+    ///             }))
+    ///     }
+    /// }
+    /// 
+    /// impl Default for ConcreteMode {
+    ///     fn default() -> Self {
+    ///         ConcreteMode { count: 0 }
+    ///     }
+    /// }
+    /// 
+    /// // Create an Automaton with a default `Mode`.
+    /// let mut automaton = Automaton::<ConcreteMode>::new();
+    /// assert!(automaton.borrow_mode_mut().count == 0);
+    /// 
+    /// // Keep transitioning the current Mode out until we reach the target state (i.e. a count of 10).
+    /// while automaton.borrow_mode_mut().count < 10 {
+    ///     automaton.perform_transitions();
+    /// }
+    /// ```
     /// 
     pub fn new() -> Self {
         Self {
@@ -128,7 +158,7 @@ impl<Base> Default for Automaton<Base>
 {
     /// Creates a new `Automaton` with the default `Mode` active. This is equivalent to calling `Automaton::new()`.
     /// 
-    /// See note on `new()` for when this can be used.
+    /// See note on [`new()`](struct.Automaton.html#method.new) for more on when this function can be used.
     /// 
     fn default() -> Self {
         Self::new()
