@@ -49,6 +49,28 @@ use crate::Transition;
 /// }
 /// ```
 /// 
+/// # The `Base` parameter
+/// You will notice from the [example](#usage) above that `ModeA` and `ModeB` implement `Mode` and `MyMode` separately,
+/// but the `MyMode` trait itself does **not** extend `Mode`, i.e. is defined as `trait MyMode` as opposed to
+/// `trait MyMode : Mode<Base = MyMode>`. We want to use `MyMode` as the `Base` type for `ModeA` and `ModeB`, but
+/// unfortunately having `MyMode` extend `Mode<Base = MyMode>` would create a circular dependency between the two types,
+/// and would cause a compile error. Hence, while it is possible to cast `ModeA` or `ModeB` to `MyMode` or `Mode`,
+/// casting between `MyMode` and `Mode` is not allowed.
+/// 
+/// # `as_base()` and `as_base_mut()`
+/// As mentioned above, a `Mode` reference **cannot** be cast to its `Base` type. What's more, the `Automaton` can only
+/// require that the current `Mode` implements `Mode<Base = Base>`, and **cannot** enforce that it is also convertible
+/// to `Base`. That's because `Base` is a type parameter and not a trait, and therefore **cannot** be used as a
+/// constraint in `where` clauses, e.g. `where T : Base`.
+/// 
+/// Since the `Automaton` needs to be able to return a `Base` reference to the current `Mode`, each `Mode` is required
+/// to implement `as_base()` and `as_base_mut()` functions that return `self` as a `&Base` and a `&mut Base`,
+/// respectively. Unfortunately, these functions have to be defined manually for each struct that implements `Mode`.
+/// 
+/// **NOTE:** This may change when [`Unsize`](https://github.com/rust-lang/rfcs/blob/master/text/0982-dst-coercion.md)
+/// becomes stable, since it will provide a way for `struct`s to express that a generic parameter must be convertible to
+/// a particular type.
+/// 
 pub trait Mode : 'static {
     /// Represents the user-facing interface for the `Mode` that will be exposed via the `Automaton`. In order to be
     /// used with an `Automaton`, the `Base` type of the `Mode` **must** match the `Base` type of the `Automaton`. This

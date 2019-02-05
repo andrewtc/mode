@@ -20,6 +20,8 @@ use crate::{AnyModeWrapper, Mode, ModeWrapper};
 /// `Automaton`. However, this also implies that the `Automaton` will **only** be able to switch between states of the
 /// same concrete type.
 /// 
+/// For more on the `Base` parameter, see [`Mode`](trait.Mode.html).
+/// 
 /// # Usage
 /// ```
 /// use mode::*;
