@@ -1,7 +1,20 @@
 [package]
 name = "mode"
-version = "0.1.0"
-authors = ["andrewtc <andrew@andrewtc.com>"]
+version = "1.0.0"
+authors = ["Andrew Thomas Christensen <andrew@andrewtc.com>"]
 edition = "2018"
+
+description = "A behavioral state machine library written in Rust"
+
+documentation = "https://docs.rs/mode"
+homepage = "https://github.com/andrewtc/mode"
+repository = "https://github.com/andrewtc/mode"
+
+readme = "README.md"
+
+keywords = ["state", "machine", "behavior", "behavioral"]
+categories = ["rust-patterns", "simulation", "data-structures"]
+
+license = "Apache-2.0 OR MIT"
 
 [dependencies]

@@ -1,3 +1,9 @@
+// Copyright 2019 Andrew Thomas Christensen
+//
+// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the
+// MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
+// modified, or distributed except according to those terms.
+
 //! A simple and effective behavioral state machine library, written in in idiomatic, 100% safe, stable Rust code.
 //! 
 //! This library provides three main types, `Automaton`, `Mode`, and `Transition`, that facilitate the creation of
