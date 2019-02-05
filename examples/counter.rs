@@ -2,16 +2,16 @@ extern crate mode;
 
 use mode::*;
 
-/// Defines the public interface of all `Mode`s below.
+// Defines the public interface of all `Mode`s below.
 trait CounterMode {
-    /// Tells the `CounterMode` to update once.
+    // Tells the `CounterMode` to update once.
     fn update(&mut self);
 
-    /// Returns an `i32` if the program is finished and a final result has been returned.
+    // Returns an `i32` if the program is finished and a final result has been returned.
     fn get_result(&self) -> Option<i32> { None }
 }
 
-/// `CounterMode` that increments a counter value until it reaches the target value.
+// `CounterMode` that increments a counter value until it reaches the target value.
 struct UpMode {
     pub counter : i32,
     pub target : i32,
@@ -44,7 +44,7 @@ impl Mode for UpMode {
     }
 }
 
-/// `CounterMode` that decrements a counter value until it reaches the target value.
+// `CounterMode` that decrements a counter value until it reaches the target value.
 struct DownMode {
     pub counter : i32,
     pub target : i32,
@@ -87,7 +87,7 @@ impl Mode for DownMode {
     }
 }
 
-/// Represents that we've finished counting and have a final result.
+// Represents that we've finished counting and have a final result.
 struct FinishedMode {
     result : i32,
 }
