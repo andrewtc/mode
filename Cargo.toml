@@ -7,7 +7,6 @@ edition = "2018"
 description = "A behavioral state machine library written in Rust"
 
 documentation = "https://docs.rs/mode"
-homepage = "https://github.com/andrewtc/mode"
 repository = "https://github.com/andrewtc/mode"
 
 readme = "README.md"
