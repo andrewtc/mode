@@ -5,6 +5,7 @@
 // modified, or distributed except according to those terms.
 
 use crate::{AnyModeWrapper, Mode, ModeWrapper};
+use std::fmt;
 
 /// Represents a state machine over a set of `Mode`s that can be referenced via some common interface `Base`.
 /// 
@@ -170,5 +171,51 @@ impl<Base> Default for Automaton<Base>
     /// 
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// If `Base` implements `std::fmt::Debug`, `Automaton` also implements `Debug`, and will print the `current_mode`.
+/// 
+/// # Usage
+/// ```
+/// use mode::*;
+/// use std::fmt;
+/// 
+/// trait MyBase : fmt::Debug { } // TODO: Add common interface.
+/// 
+/// #[derive(Debug)]
+/// struct MyMode {
+///     pub foo : i32,
+///     pub bar : &'static str,
+/// }
+/// 
+/// impl MyBase for MyMode { } // TODO: Implement common interface.
+/// 
+/// impl Mode for MyMode {
+///     type Base = MyBase;
+///     fn as_base(&self) -> &Self::Base { self }
+///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
+///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None } // TODO
+/// }
+/// 
+/// let automaton = Automaton::with_initial_mode(MyMode { foo: 3, bar: "Hello, World!" });
+/// dbg!(automaton);
+/// ```
+/// 
+impl<Base> fmt::Debug for Automaton<Base>
+    where Base : fmt::Debug + ?Sized
+{
+    fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct("Automaton")
+            .field("current_mode", &self.borrow_mode())
+            .finish()
+    }
+}
+
+impl<Base> fmt::Display for Automaton<Base>
+    where Base : fmt::Display + ?Sized
+{
+    fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.borrow_mode())
     }
 }
