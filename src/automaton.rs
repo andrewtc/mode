@@ -48,7 +48,7 @@ use std::fmt;
 /// #     type Base = MyMode;
 /// #     fn as_base(&self) -> &Self::Base { self }
 /// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-/// #     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None }
+/// #     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> { None }
 /// # }
 /// # 
 /// // Use with_initial_mode() to create the Automaton with an initial state.
@@ -65,7 +65,7 @@ use std::fmt;
 pub struct Automaton<Base>
     where Base : ?Sized
 {
-    current_mode : Box<AnyModeWrapper<Base = Base>>,
+    current_mode : Box<dyn AnyModeWrapper<Base = Base>>,
 }
 
 impl<Base> Automaton<Base>
@@ -130,7 +130,7 @@ impl<Base> Automaton<Base>
     ///     type Base = Self;
     ///     fn as_base(&self) -> &Self { self }
     ///     fn as_base_mut(&mut self) -> &mut Self { self }
-    ///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
+    ///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> {
     ///         // TODO: Logic for transitioning between states goes here.
     ///         Some(Box::new(
     ///             |previous : Self| {
@@ -195,7 +195,7 @@ impl<Base> Default for Automaton<Base>
 ///     type Base = MyBase;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None } // TODO
+///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> { None } // TODO
 /// }
 /// 
 /// let automaton = Automaton::with_initial_mode(MyMode { foo: 3, bar: "Hello, World!" });

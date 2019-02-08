@@ -38,7 +38,7 @@ use crate::Transition;
 ///     type Base = MyMode;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
+///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> {
 ///         // Transition to ModeB. ModeA can swap to ModeB because both share the same Base.
 ///         Some(Box::new(|previous : Self| { ModeB }))
 ///     }
@@ -51,7 +51,7 @@ use crate::Transition;
 ///     type Base = MyMode;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None } // None means don't transition.
+///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> { None } // None means don't transition.
 /// }
 /// ```
 /// 
@@ -80,8 +80,8 @@ use crate::Transition;
 pub trait Mode : 'static {
     /// Represents the user-facing interface for the `Mode` that will be exposed via the `Automaton`. In order to be
     /// used with an `Automaton`, the `Base` type of the `Mode` **must** match the `Base` type of the `Automaton`. This
-    /// is so that the `Automaton` can provide `get_mode()` and `get_mode_mut()` functions that return a reference to
-    /// the `Mode` as the `Base` type.
+    /// is so that the `Automaton` can provide `borrow_mode()` and `borrow_mode_mut()` functions that return a reference
+    /// to the `Mode` as the `Base` type.
     /// 
     type Base : ?Sized;
 
@@ -100,5 +100,5 @@ pub trait Mode : 'static {
     /// 
     /// See [`Transition`](trait.Transition.html) for more details.
     /// 
-    fn get_transition(&mut self) -> Option<Box<Transition<Self>>>;
+    fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>>;
 }
