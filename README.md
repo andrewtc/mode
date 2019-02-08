@@ -2,7 +2,7 @@
 A simple and effective behavioral state machine library, written in in idiomatic, 100% safe, stable Rust code.
 This library provides three main types, `Automaton`, `Mode`, and `Transition`, that facilitate the creation of
 behavioral state machines. An `Automaton` can be used to quickly create a state machine over a set of `Mode`s that
-implement some `Base` type. Each struct that implements `Mode` represents a distinct state in the state machine, an
+implement some `Base` type. Each struct that implements `Mode` represents a distinct state in the state machine, and
 the `Automaton` allows function calls to be dispatched to the current `Mode` by providing access to it as a `Base`
 reference. A flexible `Transition` system provides a way for the current `Mode` to swap in a new state when it is
 ready. The `Transition` system is designed such that the current `Mode` can move data from itself directly into the
