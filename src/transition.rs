@@ -40,7 +40,7 @@ use crate::{AnyModeWrapper, Mode, ModeWrapper};
 /// #   fn as_base(&self) -> &Self::Base { self }
 /// #   fn as_base_mut(&mut self) -> &mut Self::Base { self }
 ///     // ...
-///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
+///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> {
 /// #       let some_condition = true;
 /// #       let some_other_condition = true;
 ///         // ...
@@ -65,7 +65,7 @@ use crate::{AnyModeWrapper, Mode, ModeWrapper};
 /// #     type Base = MyMode;
 /// #     fn as_base(&self) -> &Self::Base { self }
 /// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-/// #     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None }
+/// #     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> { None }
 /// # }
 /// #
 /// # struct YetAnotherMode;
@@ -75,7 +75,7 @@ use crate::{AnyModeWrapper, Mode, ModeWrapper};
 /// #     type Base = MyMode;
 /// #     fn as_base(&self) -> &Self::Base { self }
 /// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-/// #     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None }
+/// #     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> { None }
 /// # }
 /// ```
 /// 
@@ -103,7 +103,7 @@ use crate::{AnyModeWrapper, Mode, ModeWrapper};
 /// # }
 /// #
 /// struct SomeMode {
-///     queued_transition : Option<Box<Transition<Self>>>
+///     queued_transition : Option<Box<dyn Transition<Self>>>
 /// }
 /// 
 /// impl MyMode for SomeMode {
@@ -124,7 +124,7 @@ use crate::{AnyModeWrapper, Mode, ModeWrapper};
 /// #   fn as_base(&self) -> &Self::Base { self }
 /// #   fn as_base_mut(&mut self) -> &mut Self::Base { self }
 ///     // ...
-///     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> {
+///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> {
 /// #       let ready_to_transition = true;
 ///         // ...
 ///         if ready_to_transition && self.queued_transition.is_some() {
@@ -142,7 +142,7 @@ use crate::{AnyModeWrapper, Mode, ModeWrapper};
 /// #     type Base = MyMode;
 /// #     fn as_base(&self) -> &Self::Base { self }
 /// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-/// #     fn get_transition(&mut self) -> Option<Box<Transition<Self>>> { None }
+/// #     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> { None }
 /// # }
 /// ```
 /// 
@@ -157,7 +157,7 @@ pub trait Transition<A>
     /// implementation details of the `Automaton`. Unfortunately, that isn't possible, in this case, because the `Mode`
     /// trait cannot be made into an object, and therefore cannot be boxed.
     /// 
-    fn invoke(self : Box<Self>, mode : A) -> Box<AnyModeWrapper<Base = A::Base>>;
+    fn invoke(self : Box<Self>, mode : A) -> Box<dyn AnyModeWrapper<Base = A::Base>>;
 }
 
 impl<T, A, B> Transition<A> for T
@@ -166,7 +166,7 @@ impl<T, A, B> Transition<A> for T
         A : Mode,
         B : Mode<Base = A::Base>,
 {
-    fn invoke(self : Box<Self>, mode : A) -> Box<AnyModeWrapper<Base = A::Base>> {
+    fn invoke(self : Box<Self>, mode : A) -> Box<dyn AnyModeWrapper<Base = A::Base>> {
         // Call the transition function and wrap the result with a ModeWrapper.
         Box::new(ModeWrapper::<B>::new((self)(mode)))
     }

@@ -26,7 +26,7 @@ pub trait AnyModeWrapper {
     /// this yields a `Transition`, the `Transition` will be called on the inner `Mode` and a new `ModeWrapper` around
     /// the `Mode` to be swapped in will be returned.
     /// 
-    fn perform_transitions(&mut self) -> Option<Box<AnyModeWrapper<Base = Self::Base>>>;
+    fn perform_transitions(&mut self) -> Option<Box<dyn AnyModeWrapper<Base = Self::Base>>>;
 }
 
 /// Wraps a specific instance of `Mode`, allowing the parent `Automaton` to handle `Transition`s between that instance
@@ -66,7 +66,7 @@ impl<T> AnyModeWrapper for ModeWrapper<T>
         self.mode.as_mut().unwrap().as_base_mut()
     }
 
-    fn perform_transitions(&mut self) -> Option<Box<AnyModeWrapper<Base = Self::Base>>> {
+    fn perform_transitions(&mut self) -> Option<Box<dyn AnyModeWrapper<Base = Self::Base>>> {
         // Retrieve the desired transition, if any, from the inner Mode.
         match self.mode.as_mut().unwrap().get_transition() {
             None => None,
