@@ -31,11 +31,11 @@ impl CounterMode for UpMode {
     }
 }
 
-impl Mode for UpMode {
-    type Base = CounterMode;
+impl<'a> Mode<'a> for UpMode {
+    type Base = dyn CounterMode + 'a;
     fn as_base(&self) -> &Self::Base { self }
     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-    fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> {
+    fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
         if self.counter == self.target {
             // If we've reached the target value, start counting down to (roughly) the median value.
             Some(Box::new(
@@ -64,11 +64,11 @@ impl CounterMode for DownMode {
     }
 }
 
-impl Mode for DownMode {
-    type Base = CounterMode;
+impl<'a> Mode<'a> for DownMode {
+    type Base = dyn CounterMode + 'a;
     fn as_base(&self) -> &Self::Base { self }
     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-    fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> {
+    fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
         const GOAL : i32 = 10;
         if self.counter == GOAL {
             // When we finally count down to the goal value, end the program by swapping in a "finished" state.
@@ -103,11 +103,11 @@ impl CounterMode for FinishedMode {
     fn get_result(&self) -> Option<i32> { Some(self.result) }
 }
 
-impl Mode for FinishedMode {
-    type Base = CounterMode;
+impl<'a> Mode<'a> for FinishedMode {
+    type Base = dyn CounterMode + 'a;
     fn as_base(&self) -> &Self::Base { self }
     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-    fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> {
+    fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
         // We're finished calculating, so we never want to transition.
         None
     }

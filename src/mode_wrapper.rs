@@ -6,9 +6,11 @@
 
 use crate::Mode;
 
+use std::marker::PhantomData;
+
 /// Defines the `Automaton`-facing interface for a `ModeWrapper`.
 /// 
-pub trait AnyModeWrapper {
+pub trait AnyModeWrapper<'a> {
     /// Represents the user-facing interface for the `Mode` that will be exposed via the `Automaton`. See `Mode::Base`
     /// for more details.
     /// 
@@ -26,7 +28,7 @@ pub trait AnyModeWrapper {
     /// this yields a `Transition`, the `Transition` will be called on the inner `Mode` and a new `ModeWrapper` around
     /// the `Mode` to be swapped in will be returned.
     /// 
-    fn perform_transitions(&mut self) -> Option<Box<dyn AnyModeWrapper<Base = Self::Base>>>;
+    fn perform_transitions(&mut self) -> Option<Box<dyn AnyModeWrapper<'a, Base = Self::Base> + 'a>>;
 }
 
 /// Wraps a specific instance of `Mode`, allowing the parent `Automaton` to handle `Transition`s between that instance
@@ -35,26 +37,28 @@ pub trait AnyModeWrapper {
 /// **NOTE:** This `struct` mainly exists to allow `Transition`s to be scheduled as `FnOnce(A) -> B` instead of
 /// requiring each user-defined `Mode` to know more about the implementation details of the `Automaton`.
 /// 
-pub(crate) struct ModeWrapper<T>
-    where T : Mode
+pub(crate) struct ModeWrapper<'a, T>
+    where T : Mode<'a>,
 {
+    phantom : PhantomData<&'a T>,
     mode : Option<T>,
 }
 
-impl<T> ModeWrapper<T>
-    where T : Mode
+impl<'a, T> ModeWrapper<'a, T>
+    where T : Mode<'a>,
 {
     /// Creates and returns a new `ModeWrapper` around the specified `Mode`.
     /// 
     pub fn new(mode : T) -> Self {
         Self {
+            phantom: PhantomData,
             mode: Some(mode),
         }
     }
 }
 
-impl<T> AnyModeWrapper for ModeWrapper<T>
-    where T : Mode
+impl<'a, T> AnyModeWrapper<'a> for ModeWrapper<'a, T>
+    where T : Mode<'a>,
 {
     type Base = T::Base;
 
@@ -66,7 +70,7 @@ impl<T> AnyModeWrapper for ModeWrapper<T>
         self.mode.as_mut().unwrap().as_base_mut()
     }
 
-    fn perform_transitions(&mut self) -> Option<Box<dyn AnyModeWrapper<Base = Self::Base>>> {
+    fn perform_transitions(&mut self) -> Option<Box<dyn AnyModeWrapper<'a, Base = Self::Base> + 'a>> {
         // Retrieve the desired transition, if any, from the inner Mode.
         match self.mode.as_mut().unwrap().get_transition() {
             None => None,

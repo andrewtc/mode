@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::Transition;
+use crate::TransitionBox;
 
 /// Trait that represents a state within an `Automaton`.
 /// 
@@ -34,11 +34,11 @@ use crate::Transition;
 /// struct ModeA; // TODO: Add fields.
 /// impl MyMode for ModeA { }
 /// 
-/// impl Mode for ModeA {
-///     type Base = MyMode;
+/// impl<'a> Mode<'a> for ModeA {
+///     type Base = MyMode + 'a;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> {
+///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
 ///         // Transition to ModeB. ModeA can swap to ModeB because both share the same Base.
 ///         Some(Box::new(|previous : Self| { ModeB }))
 ///     }
@@ -47,11 +47,11 @@ use crate::Transition;
 /// struct ModeB; // TODO: Add fields.
 /// impl MyMode for ModeB { }
 /// 
-/// impl Mode for ModeB {
-///     type Base = MyMode;
+/// impl<'a> Mode<'a> for ModeB {
+///     type Base = MyMode + 'a;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> { None } // None means don't transition.
+///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> { None } // None means don't transition.
 /// }
 /// ```
 /// 
@@ -77,13 +77,13 @@ use crate::Transition;
 /// becomes stable, since it will provide a way for `struct`s to express that a generic parameter must be convertible to
 /// a particular type.
 /// 
-pub trait Mode : 'static {
+pub trait Mode<'a> {
     /// Represents the user-facing interface for the `Mode` that will be exposed via the `Automaton`. In order to be
     /// used with an `Automaton`, the `Base` type of the `Mode` **must** match the `Base` type of the `Automaton`. This
     /// is so that the `Automaton` can provide `borrow_mode()` and `borrow_mode_mut()` functions that return a reference
     /// to the `Mode` as the `Base` type.
     /// 
-    type Base : ?Sized;
+    type Base : 'a + ?Sized;
 
     /// Returns an immutable reference to this `Mode` as a `&Self::Base`.
     /// 
@@ -100,5 +100,5 @@ pub trait Mode : 'static {
     /// 
     /// See [`Transition`](trait.Transition.html) for more details.
     /// 
-    fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>>;
+    fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>>;
 }
