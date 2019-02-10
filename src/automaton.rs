@@ -26,17 +26,12 @@ use std::fmt;
 /// ```
 /// use mode::*;
 /// 
-/// trait NumberMode {
-///     fn update(&mut self);
-///     fn get_step(&self) -> u32;
-/// }
-/// 
 /// struct IncrementMode<'a> {
 ///     pub number : &'a mut u32,
 ///     pub step : u32,
 /// }
 /// 
-/// impl<'a> NumberMode for IncrementMode<'a> {
+/// impl<'a> IncrementMode<'a> {
 ///     fn update(&mut self) {
 ///         *self.number += self.step
 ///     }
@@ -45,7 +40,7 @@ use std::fmt;
 /// }
 /// 
 /// impl<'a> Mode<'a> for IncrementMode<'a> {
-///     type Base = NumberMode + 'a;
+///     type Base = Self;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
 ///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
