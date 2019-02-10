@@ -107,7 +107,9 @@
 //!     
 //!     for age in (18..100) {
 //!         // Update the current Mode for the Automaton.
-//!         person.borrow_mode_mut().update();
+//!         // NOTE: We can call update() on the inner Mode through the Automaton reference,
+//!         // due to Deref coercion.
+//!         person.update();
 //! 
 //!         // Allow the Automaton to switch Modes.
 //!         person.perform_transitions();

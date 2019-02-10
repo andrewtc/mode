@@ -125,16 +125,14 @@ fn main() {
     loop {
         // Update the inner Mode.
         {
-            let mode = automaton.borrow_mode_mut();
-
-            if let Some(result) = mode.get_result() {
+            if let Some(result) = automaton.get_result() {
                 // If the current mode returns a result, print it and exit the program.
                 println!("Result: {}", result);
                 break;
             }
             else {
                 // Keep updating the current mode until it wants to transition or we get a result.
-                mode.update();
+                automaton.update();
             }
         }
 

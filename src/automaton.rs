@@ -6,12 +6,14 @@
 
 use crate::{AnyModeWrapper, Mode, ModeWrapper};
 use std::fmt;
+use std::ops::{Deref, DerefMut};
 
 /// Represents a state machine over a set of `Mode`s that can be referenced via some common interface `Base`.
 /// 
 /// The `Automaton` contains a single, active `Mode` that represents the current state of the state machine. The current
-/// `Mode` is accessible via the `borrow_mode()` and `borrow_mode_mut()` functions, which return a `Base` reference. The
-/// `Automaton` also provides a `perform_transitions()` function that should be called at some point in order to allow
+/// `Mode` is accessible via the `borrow_mode()` and `borrow_mode_mut()` functions, which return a `Base` reference.
+/// Functions and members of the inner `Base` type can also be accessed directly via the `Deref` and `DerefMut` traits.
+/// The `Automaton` provides a `perform_transitions()` function that should be called at some point in order to allow
 /// the current `Mode` to transition another `Mode` in, if desired.
 /// 
 /// See [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
@@ -62,9 +64,11 @@ use std::fmt;
 ///     let mut automaton =
 ///         Automaton::with_initial_mode(IncrementMode { number: &mut number, step: 10 });
 ///     
-///     while automaton.borrow_mode().get_step() > 0 {
+///     // NOTE: Automaton implements Deref so that all Base functions can be called
+///     // through an Automaton reference.
+///     while automaton.get_step() > 0 {
 ///         // Update the current Mode.
-///         automaton.borrow_mode_mut().update();
+///         automaton.update();
 ///     
 ///         // Let the Automaton handle transitions.
 ///         automaton.perform_transitions();
@@ -113,7 +117,12 @@ use std::fmt;
 /// // Use with_initial_mode() to create the Automaton with an initial state.
 /// let mut automaton = Automaton::with_initial_mode(SomeMode);
 /// 
-/// // To call functions on the inner Mode, use borrow_mode() or borrow_mode_mut();
+/// // Functions can be called on the inner Mode through an Automaton reference
+/// // via the Deref and DerefMut traits
+/// automaton.some_fn();
+/// automaton.some_mut_fn();
+/// 
+/// // If you want to be more explicit, use borrow_mode() or borrow_mode_mut();
 /// automaton.borrow_mode().some_fn();
 /// automaton.borrow_mode_mut().some_mut_fn();
 /// 
@@ -158,6 +167,10 @@ impl<'a, Base> Automaton<'a, Base>
     /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be
     /// called on the inner `Mode`.
     /// 
+    /// **NOTE:** `Automaton` also implements `Deref<Target = Base>`, allowing all `Base` members to be accessed via a
+    /// reference to the `Automaton`. Hence, you can usually leave the `borrow_mode()` out and simply treat the
+    /// `Automaton` as if it were an object of type `Base`.
+    /// 
     pub fn borrow_mode(&self) -> &Base {
         self.current_mode.borrow_mode()
     }
@@ -165,7 +178,35 @@ impl<'a, Base> Automaton<'a, Base>
     /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`, allowing mutable functions to be
     /// called on the inner `Mode`.
     /// 
+    /// **NOTE:** `Automaton` also implements `Deref<Target = Base>`, allowing all `Base` members to be accessed via a
+    /// reference to the `Automaton`. Hence, you can usually leave the `borrow_mode_mut()` out and simply treat the
+    /// `Automaton` as if it were an object of type `Base`.
+    /// 
     pub fn borrow_mode_mut(&mut self) -> &mut Base {
+        self.current_mode.borrow_mode_mut()
+    }
+}
+
+impl<'a, Base> Deref for Automaton<'a, Base>
+    where Base : 'a + ?Sized
+{
+    type Target = Base;
+
+    /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be
+    /// called on the inner `Mode`.
+    /// 
+    fn deref(&self) -> &Base {
+        self.current_mode.borrow_mode()
+    }
+}
+
+impl<'a, Base> DerefMut for Automaton<'a, Base>
+    where Base : 'a + ?Sized
+{
+    /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`, allowing mutable functions to be
+    /// called on the inner `Mode`.
+    /// 
+    fn deref_mut(&mut self) -> &mut Base {
         self.current_mode.borrow_mode_mut()
     }
 }
@@ -204,12 +245,15 @@ impl<'a, Base> Automaton<'a, Base>
     ///     }
     /// }
     /// 
-    /// // Create an Automaton with a default `Mode`.
+    /// // Create an Automaton with a default Mode.
+    /// // NOTE: Deref coercion allows us to access the CounterMode's count variable
+    /// // through an Automaton reference.
     /// let mut automaton = Automaton::<ConcreteMode>::new();
-    /// assert!(automaton.borrow_mode_mut().count == 0);
+    /// assert!(automaton.count == 0);
     /// 
-    /// // Keep transitioning the current Mode out until we reach the target state (i.e. a count of 10).
-    /// while automaton.borrow_mode_mut().count < 10 {
+    /// // Keep transitioning the current Mode out until we reach the target state
+    /// // (i.e. a count of 10).
+    /// while automaton.count < 10 {
     ///     automaton.perform_transitions();
     /// }
     /// ```
