@@ -8,6 +8,9 @@ reference. A flexible `Transition` system provides a way for the current `Mode` 
 ready. The `Transition` system is designed such that the current `Mode` can move data from itself directly into the
 `Mode` being created, which can help prevent spikes in memory usage while switching from one state to the next.
 
+## Releases
+See the full list of releases on [GitHub](https://github.com/andrewtc/mode/releases).
+
 ## Documentation
 Please see [docs.rs](https://docs.rs/mode) for detailed documentation.
 
