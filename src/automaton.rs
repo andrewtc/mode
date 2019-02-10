@@ -16,6 +16,70 @@ use std::fmt;
 /// 
 /// See [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
 /// 
+/// # The `'a` lifetime
+/// Most types in this library include an explicit `'a` lifetime, which represents the lifetime of the `Automaton`
+/// wrapping each `Mode`. In order for a `Mode` to be used with an `Automaton`, all references within the `Mode` must
+/// outlive the parent `Automaton`. Having this lifetime allows for the creation of `Mode`s that store references to
+/// objects that outlive the `Automaton` but are still declared on the stack. (See example below.)
+/// 
+/// ## Example
+/// ```
+/// use mode::*;
+/// 
+/// trait NumberMode {
+///     fn update(&mut self);
+///     fn get_step(&self) -> u32;
+/// }
+/// 
+/// struct IncrementMode<'a> {
+///     pub number : &'a mut u32,
+///     pub step : u32,
+/// }
+/// 
+/// impl<'a> NumberMode for IncrementMode<'a> {
+///     fn update(&mut self) {
+///         *self.number += self.step
+///     }
+/// 
+///     fn get_step(&self) -> u32 { self.step }
+/// }
+/// 
+/// impl<'a> Mode<'a> for IncrementMode<'a> {
+///     type Base = NumberMode + 'a;
+///     fn as_base(&self) -> &Self::Base { self }
+///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
+///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
+///         if self.step > 0 {
+///             // Transition to another IncrementMode with a lower step amount.
+///             Some(Box::new(|previous : Self| {
+///                 IncrementMode { number: previous.number, step: previous.step - 1 }
+///             }))
+///         }
+///         else { None } // None means don't transition
+///     }
+/// }
+/// 
+/// // Create a shared counter and pass it into the Mode.
+/// let mut number : u32 = 0;
+/// 
+/// // NOTE: The Automaton can't outlive our shared counter.
+/// {
+///     let mut automaton =
+///         Automaton::with_initial_mode(IncrementMode { number: &mut number, step: 10 });
+///     
+///     while automaton.borrow_mode().get_step() > 0 {
+///         // Update the current Mode.
+///         automaton.borrow_mode_mut().update();
+///     
+///         // Let the Automaton handle transitions.
+///         automaton.perform_transitions();
+///     }
+/// }
+/// 
+/// // Make sure we got the right result.
+/// assert_eq!(number, 55);
+/// ```
+/// 
 /// # The `Base` parameter
 /// 
 /// The `Base` parameter may be either a `trait` (e.g. `Automaton<dyn SomeTrait>`) or a concrete type
@@ -44,11 +108,11 @@ use std::fmt;
 /// #     fn some_mut_fn(&mut self) { println!("some_mut_fn was called"); }
 /// # }
 /// # 
-/// # impl Mode for SomeMode {
-/// #     type Base = MyMode;
+/// # impl<'a> Mode<'a> for SomeMode {
+/// #     type Base = MyMode + 'a;
 /// #     fn as_base(&self) -> &Self::Base { self }
 /// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-/// #     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> { None }
+/// #     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> { None }
 /// # }
 /// # 
 /// // Use with_initial_mode() to create the Automaton with an initial state.
@@ -62,20 +126,20 @@ use std::fmt;
 /// automaton.perform_transitions();
 /// ```
 /// 
-pub struct Automaton<Base>
+pub struct Automaton<'a, Base>
     where Base : ?Sized
 {
-    current_mode : Box<dyn AnyModeWrapper<Base = Base>>,
+    current_mode : Box<dyn AnyModeWrapper<'a, Base = Base> + 'a>,
 }
 
-impl<Base> Automaton<Base>
-    where Base : ?Sized
+impl<'a, Base> Automaton<'a, Base>
+    where Base : 'a + ?Sized
 {
     /// Creates a new `Automaton` with the specified `initial_mode`, which will be the active `Mode` for the `Automaton`
     /// that is returned.
     /// 
     pub fn with_initial_mode<M>(initial_mode : M) -> Self
-        where M : Mode<Base = Base>
+        where M : 'a + Mode<'a, Base = Base>
     {
         Self {
             current_mode : Box::new(ModeWrapper::new(initial_mode)),
@@ -111,8 +175,8 @@ impl<Base> Automaton<Base>
     }
 }
 
-impl<Base> Automaton<Base>
-    where Base : Mode<Base = Base> + Default
+impl<'a, Base> Automaton<'a, Base>
+    where Base : 'a + Mode<'a, Base = Base> + Default
 {
     /// Creates a new `Automaton` with a default `Mode` instance as the active `Mode`.
     /// 
@@ -126,11 +190,11 @@ impl<Base> Automaton<Base>
     /// 
     /// struct ConcreteMode { count : u32 };
     /// 
-    /// impl Mode for ConcreteMode {
+    /// impl<'a> Mode<'a> for ConcreteMode {
     ///     type Base = Self;
     ///     fn as_base(&self) -> &Self { self }
     ///     fn as_base_mut(&mut self) -> &mut Self { self }
-    ///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> {
+    ///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
     ///         // TODO: Logic for transitioning between states goes here.
     ///         Some(Box::new(
     ///             |previous : Self| {
@@ -162,8 +226,8 @@ impl<Base> Automaton<Base>
     }
 }
 
-impl<Base> Default for Automaton<Base>
-    where Base : Mode<Base = Base> + Default
+impl<'a, Base> Default for Automaton<'a, Base>
+    where Base : 'a + Mode<'a, Base = Base> + Default
 {
     /// Creates a new `Automaton` with the default `Mode` active. This is equivalent to calling `Automaton::new()`.
     /// 
@@ -191,19 +255,19 @@ impl<Base> Default for Automaton<Base>
 /// 
 /// impl MyBase for MyMode { } // TODO: Implement common interface.
 /// 
-/// impl Mode for MyMode {
-///     type Base = MyBase;
+/// impl<'a> Mode<'a> for MyMode {
+///     type Base = MyBase + 'a;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<Box<dyn Transition<Self>>> { None } // TODO
+///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> { None } // TODO
 /// }
 /// 
 /// let automaton = Automaton::with_initial_mode(MyMode { foo: 3, bar: "Hello, World!" });
 /// dbg!(automaton);
 /// ```
 /// 
-impl<Base> fmt::Debug for Automaton<Base>
-    where Base : fmt::Debug + ?Sized
+impl<'a, Base> fmt::Debug for Automaton<'a, Base>
+    where Base : 'a + fmt::Debug + ?Sized
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
         formatter.debug_struct("Automaton")
@@ -212,8 +276,8 @@ impl<Base> fmt::Debug for Automaton<Base>
     }
 }
 
-impl<Base> fmt::Display for Automaton<Base>
-    where Base : fmt::Display + ?Sized
+impl<'a, Base> fmt::Display for Automaton<'a, Base>
+    where Base : 'a + fmt::Display + ?Sized
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.borrow_mode())
