@@ -154,14 +154,20 @@ impl<'a, Base> Automaton<'a, Base>
     /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
     /// `Mode` it returns as a result.
     /// 
+    /// For convenience, this function returns a `bool` representing whether a `Transition` was performed or not. A
+    /// result of `true` indicates that the `Automaton` transitioned to another `Mode`. If no `Transition` was performed
+    /// and the previous `Mode` is still active, returns `false`.
+    /// 
     /// See [`Transition`](trait.Transition.html) and
     /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
     /// 
-    pub fn perform_transitions(&mut self) {
+    pub fn perform_transitions(&mut self) -> bool {
         if let Some(mode) = self.current_mode.perform_transitions() {
             // If a transition was performed and a new `ModeWrapper` was returned, swap in the new `Mode`.
             self.current_mode = mode;
+            true
         }
+        else { false }
     }
 
     /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be

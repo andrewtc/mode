@@ -1,6 +1,6 @@
 [package]
 name = "mode"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Andrew Thomas Christensen <andrew@andrewtc.com>"]
 edition = "2018"
 
@@ -15,5 +15,8 @@ keywords = ["state", "machine", "behavior", "behavioral"]
 categories = ["rust-patterns", "simulation", "data-structures"]
 
 license = "Apache-2.0 OR MIT"
+
+[badges]
+travis-ci = { repository = "andrewtc/mode", branch = "master" }
 
 [dependencies]
