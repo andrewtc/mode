@@ -16,4 +16,7 @@ categories = ["rust-patterns", "simulation", "data-structures"]
 
 license = "Apache-2.0 OR MIT"
 
+[badges]
+travis-ci = { repository = "andrewtc/mode", branch = "master" }
+
 [dependencies]
