@@ -1,4 +1,7 @@
 # mode
+
+[![Build Status](https://travis-ci.com/andrewtc/mode.svg?branch=master)](https://travis-ci.com/andrewtc/mode)
+
 A simple and effective behavioral state machine library, written in in idiomatic, 100% safe, stable Rust code.
 This library provides three main types, `Automaton`, `Mode`, and `Transition`, that facilitate the creation of
 behavioral state machines. An `Automaton` can be used to quickly create a state machine over a set of `Mode`s that
