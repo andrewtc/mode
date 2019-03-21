@@ -1,24 +1,9 @@
-# mode
+// Copyright 2019 Andrew Thomas Christensen
+//
+// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the
+// MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
+// modified, or distributed except according to those terms.
 
-[![Build Status](https://travis-ci.com/andrewtc/mode.svg?branch=master)](https://travis-ci.com/andrewtc/mode)
-
-A simple and effective behavioral state machine library, written in in idiomatic, 100% safe, stable Rust code.
-This library provides three main types, `Automaton`, `Mode`, and `Transition`, that facilitate the creation of
-behavioral state machines. An `Automaton` can be used to quickly create a state machine over a set of `Mode`s that
-implement some `Base` type. Each struct that implements `Mode` represents a distinct state in the state machine, and
-the `Automaton` allows function calls to be dispatched to the current `Mode` by providing access to it as a `Base`
-reference. A flexible `Transition` system provides a way for the current `Mode` to swap in a new state when it is
-ready. The `Transition` system is designed such that the current `Mode` can move data from itself directly into the
-`Mode` being created, which can help prevent spikes in memory usage while switching from one state to the next.
-
-## Releases
-See the full list of releases on [GitHub](https://github.com/andrewtc/mode/releases).
-
-## Documentation
-Please see [docs.rs](https://docs.rs/mode) for detailed documentation.
-
-## Example
-```rust
 use mode::*;
 
 // This trait will be used as the Base type for the Automaton, defining a common interface
@@ -128,22 +113,3 @@ fn main() {
         person.perform_transitions();
     }
 }
-```
-
-# License
-Licensed under either of
-
- * Apache License, Version 2.0 ([LICENSE-APACHE](https://github.com/andrewtc/mode/blob/master/LICENSE-APACHE) or 
-   http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](https://github.com/andrewtc/mode/blob/master/LICENSE-MIT) or
-   http://opensource.org/licenses/MIT)
-
-at your option.
-
-## Contributing
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as
-defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
-
-If you find bugs, please feel free to open an issue on [GitHub](https://github.com/andrewtc/mode/issues)! Otherwise, if
-you would like to propose changes to this library, feel free to send me a pull request and I will handle them as best I
-can. Thanks!

@@ -30,7 +30,10 @@
 //! }
 //! 
 //! impl Activity for Working {
-//!     fn update(&mut self) { self.hours_worked += 1; }
+//!     fn update(&mut self) {
+//!         println!("Work, work, work...");
+//!         self.hours_worked += 1;
+//!     }
 //! }
 //! 
 //! impl<'a> Mode<'a> for Working {
@@ -44,6 +47,7 @@
 //!             // To swap to another Mode, a Transition function is returned, which will consume
 //!             // the current Mode and return a new Mode to be swapped in as active.
 //!             Some(Box::new(|previous : Self| {
+//!                 println!("Time for {}!", if previous.hours_worked == 4 { "lunch" } else { "dinner" });
 //!                 Eating { hours_worked: previous.hours_worked, calories_consumed: 0 }
 //!             }))
 //!         }
@@ -57,7 +61,10 @@
 //! }
 //! 
 //! impl Activity for Eating {
-//!     fn update(&mut self) { self.calories_consumed += 100; } // Yum!
+//!     fn update(&mut self) {
+//!         println!("Yum!");
+//!         self.calories_consumed += 100;
+//!     }
 //! }
 //! 
 //! impl<'a> Mode<'a> for Eating {
@@ -67,11 +74,11 @@
 //!     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
 //!         if self.calories_consumed >= 500 {
 //!             if self.hours_worked >= 8 {
-//!                 // Time for bed!
+//!                 println!("Time for bed!");
 //!                 Some(Box::new(|_ : Self| { Sleeping { hours_rested: 0 } }))
 //!             }
 //!             else {
-//!                 // Time to go back to work!
+//!                 println!("Time to go back to work!");
 //!                 Some(Box::new(|previous : Self| {
 //!                     Working { hours_worked: previous.hours_worked }
 //!                 }))
@@ -86,7 +93,10 @@
 //! }
 //! 
 //! impl Activity for Sleeping {
-//!     fn update(&mut self) { self.hours_rested += 1; } // ZzZzZzZz...
+//!     fn update(&mut self) {
+//!         println!("ZzZzZzZz...");
+//!         self.hours_rested += 1;
+//!     }
 //! }
 //! 
 //! impl<'a> Mode<'a> for Sleeping {
@@ -95,7 +105,7 @@
 //!     fn as_base_mut(&mut self) -> &mut Self::Base { self }
 //!     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
 //!         if self.hours_rested >= 8 {
-//!             // Time for breakfast!
+//!             println!("Time for breakfast!");
 //!             Some(Box::new(|_| { Eating { hours_worked: 0, calories_consumed: 0 } }))
 //!         }
 //!         else { None }
@@ -105,7 +115,7 @@
 //! fn main() {
 //!     let mut person = Automaton::with_initial_mode(Working { hours_worked: 0 });
 //!     
-//!     for age in (18..100) {
+//!     for _age in 18..100 {
 //!         // Update the current Mode for the Automaton.
 //!         // NOTE: We can call update() on the inner Mode through the Automaton reference,
 //!         // due to Deref coercion.

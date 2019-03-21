@@ -7,17 +7,22 @@
 extern crate mode;
 
 use mode::*;
+use std::fmt::Debug;
 
-// Defines the public interface of all `Mode`s below.
-trait CounterMode {
-    // Tells the `CounterMode` to update once.
+// Defines the public interface of all Modes below.
+trait CounterMode : Debug {
+    // Tells the CounterMode to update once.
     fn update(&mut self);
 
-    // Returns an `i32` if the program is finished and a final result has been returned.
+    // Returns an i32 if the program is finished and a final result has been returned.
     fn get_result(&self) -> Option<i32> { None }
+
+    // Returns true if the current CounterMode has the final result, false otherwise.
+    fn has_result(&self) -> bool { self.get_result().is_some() }
 }
 
-// `CounterMode` that increments a counter value until it reaches the target value.
+// CounterMode that increments a counter value until it reaches the target value.
+#[derive(Debug)]
 struct UpMode {
     pub counter : i32,
     pub target : i32,
@@ -27,7 +32,7 @@ impl CounterMode for UpMode {
     fn update(&mut self) {
         // Increment the counter until it reaches the target value.
         self.counter += 1;
-        println!("+ {}", self.counter);
+        print!(" {}", self.counter);
     }
 }
 
@@ -50,7 +55,8 @@ impl<'a> Mode<'a> for UpMode {
     }
 }
 
-// `CounterMode` that decrements a counter value until it reaches the target value.
+// CounterMode that decrements a counter value until it reaches the target value.
+#[derive(Debug)]
 struct DownMode {
     pub counter : i32,
     pub target : i32,
@@ -60,7 +66,7 @@ impl CounterMode for DownMode {
     fn update(&mut self) {
         // Decrement the counter until it reaches the target value.
         self.counter -= 1;
-        println!("- {}", self.counter);
+        print!(" {}", self.counter);
     }
 }
 
@@ -94,6 +100,7 @@ impl<'a> Mode<'a> for DownMode {
 }
 
 // Represents that we've finished counting and have a final result.
+#[derive(Debug)]
 struct FinishedMode {
     result : i32,
 }
@@ -122,21 +129,18 @@ fn main() {
                 target: 3,
             });
 
-    loop {
-        // Update the inner Mode.
-        {
-            if let Some(result) = automaton.get_result() {
-                // If the current mode returns a result, print it and exit the program.
-                println!("Result: {}", result);
-                break;
-            }
-            else {
-                // Keep updating the current mode until it wants to transition or we get a result.
-                automaton.update();
-            }
-        }
+    println!("Starting in {:?}", automaton.borrow_mode());
+
+    while !automaton.has_result() {
+        // Keep updating the current mode until it wants to transition or we get a result.
+        automaton.update();
 
         // Allow the Automaton to switch to another Mode after updating the current one, if desired.
-        automaton.perform_transitions();
+        if automaton.perform_transitions() {
+            println!();
+            println!("Switched to {:?}", automaton.borrow_mode());
+        }
     }
+
+    println!("FINISHED! Result: {}", automaton.get_result().unwrap());
 }
