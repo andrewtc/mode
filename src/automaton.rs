@@ -5,7 +5,7 @@
 // modified, or distributed except according to those terms.
 
 use crate::{AnyModeWrapper, Mode, ModeWrapper};
-use std::fmt;
+use std::{borrow::{Borrow, BorrowMut}, fmt};
 use std::ops::{Deref, DerefMut};
 
 /// Represents a state machine over a set of `Mode`s that can be referenced via some common interface `Base`.
@@ -213,6 +213,26 @@ impl<'a, Base> DerefMut for Automaton<'a, Base>
     /// called on the inner `Mode`.
     /// 
     fn deref_mut(&mut self) -> &mut Base {
+        self.current_mode.borrow_mode_mut()
+    }
+}
+
+impl<'a, Base> Borrow<Base> for Automaton<'a, Base>
+    where Base : 'a + ?Sized
+{
+    /// Returns an immutable reference to the current `Mode` as a `&Self::Base`.
+    /// 
+    fn borrow(&self) -> &Base {
+        self.current_mode.borrow_mode()
+    }
+}
+
+impl<'a, Base> BorrowMut<Base> for Automaton<'a, Base>
+    where Base : 'a + ?Sized
+{
+    /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`.
+    /// 
+    fn borrow_mut(&mut self) -> &mut Base {
         self.current_mode.borrow_mode_mut()
     }
 }
