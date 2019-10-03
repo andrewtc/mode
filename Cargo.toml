@@ -1,6 +1,6 @@
 [package]
 name = "mode"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Andrew Thomas Christensen <andrew@andrewtc.com>"]
 edition = "2018"
 

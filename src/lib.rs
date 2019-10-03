@@ -37,7 +37,7 @@
 //! }
 //! 
 //! impl<'a> Mode<'a> for Working {
-//!     type Base = Activity + 'a;
+//!     type Base = dyn Activity + 'a;
 //!     fn as_base(&self) -> &Self::Base { self }
 //!     fn as_base_mut(&mut self) -> &mut Self::Base { self }
 //! 
@@ -68,7 +68,7 @@
 //! }
 //! 
 //! impl<'a> Mode<'a> for Eating {
-//!     type Base = Activity + 'a;
+//!     type Base = dyn Activity + 'a;
 //!     fn as_base(&self) -> &Self::Base { self }
 //!     fn as_base_mut(&mut self) -> &mut Self::Base { self }
 //!     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
@@ -100,7 +100,7 @@
 //! }
 //! 
 //! impl<'a> Mode<'a> for Sleeping {
-//!     type Base = Activity + 'a;
+//!     type Base = dyn Activity + 'a;
 //!     fn as_base(&self) -> &Self::Base { self }
 //!     fn as_base_mut(&mut self) -> &mut Self::Base { self }
 //!     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
