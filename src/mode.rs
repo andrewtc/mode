@@ -35,7 +35,7 @@ use crate::TransitionBox;
 /// impl MyMode for ModeA { }
 /// 
 /// impl<'a> Mode<'a> for ModeA {
-///     type Base = MyMode + 'a;
+///     type Base = dyn MyMode + 'a;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
 ///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
@@ -48,7 +48,7 @@ use crate::TransitionBox;
 /// impl MyMode for ModeB { }
 /// 
 /// impl<'a> Mode<'a> for ModeB {
-///     type Base = MyMode + 'a;
+///     type Base = dyn MyMode + 'a;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
 ///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> { None } // None means don't transition.
