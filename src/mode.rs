@@ -4,8 +4,6 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::TransitionBox;
-
 /// Trait that represents a state within an `Automaton`.
 /// 
 /// Every `Automaton` contains a single `Mode` instance that represents the active state of the state machine. An
@@ -85,6 +83,8 @@ pub trait Mode<'a> {
     /// 
     type Base : 'a + ?Sized;
 
+    type Output : 'a;
+
     /// Returns an immutable reference to this `Mode` as a `&Self::Base`.
     /// 
     fn as_base(&self) -> &Self::Base;
@@ -100,5 +100,5 @@ pub trait Mode<'a> {
     /// 
     /// See [`Transition`](trait.Transition.html) for more details.
     /// 
-    fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>>;
+    fn transition(self : Box<Self>) -> (Box<dyn Mode<'a, Base = Self::Base, Output = Self::Output> + 'a>, Self::Output);
 }

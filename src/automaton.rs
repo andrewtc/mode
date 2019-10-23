@@ -4,8 +4,8 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::{AnyModeWrapper, Mode, ModeWrapper};
-use std::{borrow::{Borrow, BorrowMut}, fmt};
+use crate::Mode;
+use std::{borrow::{Borrow, BorrowMut}, convert::{AsRef, AsMut}, fmt};
 use std::ops::{Deref, DerefMut};
 
 /// Represents a state machine over a set of `Mode`s that can be referenced via some common interface `Base`.
@@ -130,23 +130,27 @@ use std::ops::{Deref, DerefMut};
 /// automaton.perform_transitions();
 /// ```
 /// 
-pub struct Automaton<'a, Base>
-    where Base : ?Sized
+pub struct Automaton<'a, Base, Output>
+    where
+        Base : 'a + ?Sized,
+        Output : 'a,
 {
-    current_mode : Box<dyn AnyModeWrapper<'a, Base = Base> + 'a>,
+    current_mode : Option<Box<dyn Mode<'a, Base = Base, Output = Output> + 'a>>,
 }
 
-impl<'a, Base> Automaton<'a, Base>
-    where Base : 'a + ?Sized
+impl<'a, Base, Output> Automaton<'a, Base, Output>
+    where
+        Base : 'a + ?Sized,
+        Output : 'a,
 {
     /// Creates a new `Automaton` with the specified `initial_mode`, which will be the active `Mode` for the `Automaton`
     /// that is returned.
     /// 
-    pub fn with_initial_mode<M>(initial_mode : M) -> Self
-        where M : 'a + Mode<'a, Base = Base>
+    pub fn with_initial_mode<M>(initial_mode : Box<M>) -> Self
+        where M : 'a + Mode<'a, Base = Base, Output = Output>
     {
         Self {
-            current_mode : Box::new(ModeWrapper::new(initial_mode)),
+            current_mode : Some(initial_mode),
         }
     }
 
@@ -161,40 +165,47 @@ impl<'a, Base> Automaton<'a, Base>
     /// See [`Transition`](trait.Transition.html) and
     /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
     /// 
-    pub fn perform_transitions(&mut self) -> bool {
-        if let Some(mode) = self.current_mode.perform_transitions() {
-            // If a transition was performed and a new `ModeWrapper` was returned, swap in the new `Mode`.
-            self.current_mode = mode;
-            true
-        }
-        else { false }
-    }
-
-    /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be
-    /// called on the inner `Mode`.
-    /// 
-    /// **NOTE:** `Automaton` also implements `Deref<Target = Base>`, allowing all `Base` members to be accessed via a
-    /// reference to the `Automaton`. Hence, you can usually leave the `borrow_mode()` out and simply treat the
-    /// `Automaton` as if it were an object of type `Base`.
-    /// 
-    pub fn borrow_mode(&self) -> &Base {
-        self.current_mode.borrow_mode()
-    }
-
-    /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`, allowing mutable functions to be
-    /// called on the inner `Mode`.
-    /// 
-    /// **NOTE:** `Automaton` also implements `Deref<Target = Base>`, allowing all `Base` members to be accessed via a
-    /// reference to the `Automaton`. Hence, you can usually leave the `borrow_mode_mut()` out and simply treat the
-    /// `Automaton` as if it were an object of type `Base`.
-    /// 
-    pub fn borrow_mode_mut(&mut self) -> &mut Base {
-        self.current_mode.borrow_mode_mut()
+    pub fn transition(this : &mut Self) -> Output {
+        let (next_mode, result) =
+            this.current_mode.take()
+                .expect("Cannot handle transition because another transition is already taking place!")
+                .transition();
+        this.current_mode = Some(next_mode);
+        result
     }
 }
 
-impl<'a, Base> Deref for Automaton<'a, Base>
-    where Base : 'a + ?Sized
+impl<'a, Base, Output> AsRef<Base> for Automaton<'a, Base, Output>
+    where
+        Base : 'a + ?Sized,
+        Output : 'a,
+{
+    /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be
+    /// called on the inner `Mode`.
+    /// 
+    fn as_ref(&self) -> &Base {
+        self.current_mode.as_ref()
+            .expect("Cannot borrow current Mode because a transition is taking place!")
+            .as_base()
+    }
+}
+
+impl<'a, Base, Output> AsMut<Base> for Automaton<'a, Base, Output>
+    where
+        Base : 'a + ?Sized,
+        Output : 'a,
+{
+    fn as_mut(&mut self) -> &mut Base {
+        self.current_mode.as_mut()
+            .expect("Cannot borrow current Mode because a transition is taking place!")
+            .as_base_mut()
+    }
+}
+
+impl<'a, Base, Output> Deref for Automaton<'a, Base, Output>
+    where
+        Base : 'a + ?Sized,
+        Output : 'a,
 {
     type Target = Base;
 
@@ -202,43 +213,51 @@ impl<'a, Base> Deref for Automaton<'a, Base>
     /// called on the inner `Mode`.
     /// 
     fn deref(&self) -> &Base {
-        self.current_mode.borrow_mode()
+        self.as_ref()
     }
 }
 
-impl<'a, Base> DerefMut for Automaton<'a, Base>
-    where Base : 'a + ?Sized
+impl<'a, Base, Output> DerefMut for Automaton<'a, Base, Output>
+    where
+        Base : 'a + ?Sized,
+        Output : 'a,
 {
     /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`, allowing mutable functions to be
     /// called on the inner `Mode`.
     /// 
     fn deref_mut(&mut self) -> &mut Base {
-        self.current_mode.borrow_mode_mut()
+        self.as_mut()
     }
 }
 
-impl<'a, Base> Borrow<Base> for Automaton<'a, Base>
-    where Base : 'a + ?Sized
+impl<'a, Base, Output> Borrow<Base> for Automaton<'a, Base, Output>
+    where
+        Base : 'a + ?Sized,
+        Output : 'a,
 {
     /// Returns an immutable reference to the current `Mode` as a `&Self::Base`.
     /// 
     fn borrow(&self) -> &Base {
-        self.current_mode.borrow_mode()
+        self.as_ref()
     }
 }
 
-impl<'a, Base> BorrowMut<Base> for Automaton<'a, Base>
-    where Base : 'a + ?Sized
+impl<'a, Base, Output> BorrowMut<Base> for Automaton<'a, Base, Output>
+    where
+        Base : 'a + ?Sized,
+        Output : 'a,
 {
     /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`.
     /// 
     fn borrow_mut(&mut self) -> &mut Base {
-        self.current_mode.borrow_mode_mut()
+        self.as_mut()
     }
 }
 
-impl<'a, Base> Automaton<'a, Base>
-    where Base : 'a + Mode<'a, Base = Base> + Default
+impl<'a, Base, Output> Automaton<'a, Base, Output>
+    where
+        Base : 'a + Mode<'a, Base = Base, Output = Output> + Default,
+        Output : 'a,
 {
     /// Creates a new `Automaton` with a default `Mode` instance as the active `Mode`.
     /// 
@@ -286,13 +305,15 @@ impl<'a, Base> Automaton<'a, Base>
     /// 
     pub fn new() -> Self {
         Self {
-            current_mode : Box::new(ModeWrapper::<Base>::new(Default::default())),
+            current_mode : Default::default(),
         }
     }
 }
 
-impl<'a, Base> Default for Automaton<'a, Base>
-    where Base : 'a + Mode<'a, Base = Base> + Default
+impl<'a, Base, Output> Default for Automaton<'a, Base, Output>
+    where
+        Base : 'a + Mode<'a, Base = Base, Output = Output> + Default,
+        Output : 'a,
 {
     /// Creates a new `Automaton` with the default `Mode` active. This is equivalent to calling `Automaton::new()`.
     /// 
@@ -331,20 +352,24 @@ impl<'a, Base> Default for Automaton<'a, Base>
 /// dbg!(automaton);
 /// ```
 /// 
-impl<'a, Base> fmt::Debug for Automaton<'a, Base>
-    where Base : 'a + fmt::Debug + ?Sized
+impl<'a, Base, Output> fmt::Debug for Automaton<'a, Base, Output>
+    where
+        Base : 'a + fmt::Debug + ?Sized,
+        Output : 'a,
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
         formatter.debug_struct("Automaton")
-            .field("current_mode", &self.borrow_mode())
+            .field("current_mode", &self.deref())
             .finish()
     }
 }
 
-impl<'a, Base> fmt::Display for Automaton<'a, Base>
-    where Base : 'a + fmt::Display + ?Sized
+impl<'a, Base, Output> fmt::Display for Automaton<'a, Base, Output>
+    where
+        Base : 'a + fmt::Display + ?Sized,
+        Output : 'a,
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.borrow_mode())
+        write!(formatter, "{}", self.deref())
     }
 }
