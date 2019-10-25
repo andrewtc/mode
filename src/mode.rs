@@ -4,6 +4,8 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
+use crate::Family;
+
 /// Trait that represents a state within an `Automaton`.
 /// 
 /// Every `Automaton` contains a single `Mode` instance that represents the active state of the state machine. An
@@ -76,22 +78,15 @@
 /// a particular type.
 /// 
 pub trait Mode<'a> {
-    /// Represents the user-facing interface for the `Mode` that will be exposed via the `Automaton`. In order to be
-    /// used with an `Automaton`, the `Base` type of the `Mode` **must** match the `Base` type of the `Automaton`. This
-    /// is so that the `Automaton` can provide `borrow_mode()` and `borrow_mode_mut()` functions that return a reference
-    /// to the `Mode` as the `Base` type.
-    /// 
-    type Base : 'a + ?Sized;
-
-    type Output : 'a;
+    type Family : Family + 'a;
 
     /// Returns an immutable reference to this `Mode` as a `&Self::Base`.
     /// 
-    fn as_base(&self) -> &Self::Base;
+    fn as_base(&self) -> &<Self::Family as Family>::Base;
 
     /// Returns a mutable reference to this `Mode` as a `&mut Self::Base`.
     /// 
-    fn as_base_mut(&mut self) -> &mut Self::Base;
+    fn as_base_mut(&mut self) -> &mut <Self::Family as Family>::Base;
 
     /// Every time `perform_transitions()` is called on an `Automaton`, This function will be called on the current
     /// `Mode` to determine whether it wants another `Mode` to become active. If this function returns `None`, the
@@ -100,5 +95,5 @@ pub trait Mode<'a> {
     /// 
     /// See [`Transition`](trait.Transition.html) for more details.
     /// 
-    fn transition(self : Box<Self>) -> (Box<dyn Mode<'a, Base = Self::Base, Output = Self::Output> + 'a>, Self::Output);
+    fn transition(self : Box<Self>) -> (Box<dyn Mode<'a, Family = Self::Family> + 'a>, <Self::Family as Family>::Output);
 }

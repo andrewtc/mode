@@ -4,8 +4,8 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::Mode;
-use std::{borrow::{Borrow, BorrowMut}, convert::{AsRef, AsMut}, fmt};
+use crate::{Family, Mode};
+use std::{convert::{AsRef, AsMut}, fmt};
 use std::ops::{Deref, DerefMut};
 
 /// Represents a state machine over a set of `Mode`s that can be referenced via some common interface `Base`.
@@ -130,30 +130,26 @@ use std::ops::{Deref, DerefMut};
 /// automaton.perform_transitions();
 /// ```
 /// 
-pub struct Automaton<'a, Base, Output>
-    where
-        Base : 'a + ?Sized,
-        Output : 'a,
+pub struct Automaton<'a, F>
+    where F : Family + 'a
 {
-    current_mode : Option<Box<dyn Mode<'a, Base = Base, Output = Output> + 'a>>,
+    current_mode : Option<Box<dyn Mode<'a, Family = F> + 'a>>,
 }
 
-impl<'a, Base, Output> Automaton<'a, Base, Output>
-    where
-        Base : 'a + ?Sized,
-        Output : 'a,
+impl<'a, F> Automaton<'a, F>
+    where F : Family + 'a
 {
     /// Creates a new `Automaton` with the specified `initial_mode`, which will be the active `Mode` for the `Automaton`
     /// that is returned.
     /// 
     pub fn with_initial_mode<M>(initial_mode : Box<M>) -> Self
-        where M : 'a + Mode<'a, Base = Base, Output = Output>
+        where M : Mode<'a, Family = F> + 'a
     {
         Self {
             current_mode : Some(initial_mode),
         }
     }
-
+    
     /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
     /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
     /// `Mode` it returns as a result.
@@ -165,7 +161,7 @@ impl<'a, Base, Output> Automaton<'a, Base, Output>
     /// See [`Transition`](trait.Transition.html) and
     /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
     /// 
-    pub fn transition(this : &mut Self) -> Output {
+    pub fn transition(this : &mut Self) -> F::Output {
         let (next_mode, result) =
             this.current_mode.take()
                 .expect("Cannot handle transition because another transition is already taking place!")
@@ -173,91 +169,65 @@ impl<'a, Base, Output> Automaton<'a, Base, Output>
         this.current_mode = Some(next_mode);
         result
     }
-}
 
-impl<'a, Base, Output> AsRef<Base> for Automaton<'a, Base, Output>
-    where
-        Base : 'a + ?Sized,
-        Output : 'a,
-{
-    /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be
-    /// called on the inner `Mode`.
-    /// 
-    fn as_ref(&self) -> &Base {
+    fn borrow_mode(&self) -> &F::Base {
         self.current_mode.as_ref()
             .expect("Cannot borrow current Mode because a transition is taking place!")
             .as_base()
     }
-}
 
-impl<'a, Base, Output> AsMut<Base> for Automaton<'a, Base, Output>
-    where
-        Base : 'a + ?Sized,
-        Output : 'a,
-{
-    fn as_mut(&mut self) -> &mut Base {
+    fn borrow_mode_mut(&mut self) -> &mut F::Base {
         self.current_mode.as_mut()
             .expect("Cannot borrow current Mode because a transition is taking place!")
             .as_base_mut()
     }
 }
 
-impl<'a, Base, Output> Deref for Automaton<'a, Base, Output>
-    where
-        Base : 'a + ?Sized,
-        Output : 'a,
+impl<'a, F> AsRef<F::Base> for Automaton<'a, F>
+    where F : Family + 'a
 {
-    type Target = Base;
+    /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be
+    /// called on the inner `Mode`.
+    /// 
+    fn as_ref(&self) -> &F::Base {
+        self.borrow_mode()
+    }
+}
+
+impl<'a, F> AsMut<F::Base> for Automaton<'a, F>
+    where F : Family + 'a
+{
+    fn as_mut(&mut self) -> &mut <F as Family>::Base {
+        self.borrow_mode_mut()
+    }
+}
+
+impl<'a, F> Deref for Automaton<'a, F>
+    where F : Family + 'a
+{
+    type Target = F::Base;
 
     /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be
     /// called on the inner `Mode`.
     /// 
-    fn deref(&self) -> &Base {
-        self.as_ref()
+    fn deref(&self) -> &F::Base {
+        self.borrow_mode()
     }
 }
 
-impl<'a, Base, Output> DerefMut for Automaton<'a, Base, Output>
-    where
-        Base : 'a + ?Sized,
-        Output : 'a,
+impl<'a, F> DerefMut for Automaton<'a, F>
+    where F : Family + 'a
 {
     /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`, allowing mutable functions to be
     /// called on the inner `Mode`.
     /// 
-    fn deref_mut(&mut self) -> &mut Base {
-        self.as_mut()
+    fn deref_mut(&mut self) -> &mut F::Base {
+        self.borrow_mode_mut()
     }
 }
 
-impl<'a, Base, Output> Borrow<Base> for Automaton<'a, Base, Output>
-    where
-        Base : 'a + ?Sized,
-        Output : 'a,
-{
-    /// Returns an immutable reference to the current `Mode` as a `&Self::Base`.
-    /// 
-    fn borrow(&self) -> &Base {
-        self.as_ref()
-    }
-}
-
-impl<'a, Base, Output> BorrowMut<Base> for Automaton<'a, Base, Output>
-    where
-        Base : 'a + ?Sized,
-        Output : 'a,
-{
-    /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`.
-    /// 
-    fn borrow_mut(&mut self) -> &mut Base {
-        self.as_mut()
-    }
-}
-
-impl<'a, Base, Output> Automaton<'a, Base, Output>
-    where
-        Base : 'a + Mode<'a, Base = Base, Output = Output> + Default,
-        Output : 'a,
+impl<'a, F> Automaton<'a, F>
+    where F : Family + Default + 'a
 {
     /// Creates a new `Automaton` with a default `Mode` instance as the active `Mode`.
     /// 
@@ -310,10 +280,8 @@ impl<'a, Base, Output> Automaton<'a, Base, Output>
     }
 }
 
-impl<'a, Base, Output> Default for Automaton<'a, Base, Output>
-    where
-        Base : 'a + Mode<'a, Base = Base, Output = Output> + Default,
-        Output : 'a,
+impl<'a, F> Default for Automaton<'a, F>
+    where F : Family + Default + 'a
 {
     /// Creates a new `Automaton` with the default `Mode` active. This is equivalent to calling `Automaton::new()`.
     /// 
@@ -352,24 +320,24 @@ impl<'a, Base, Output> Default for Automaton<'a, Base, Output>
 /// dbg!(automaton);
 /// ```
 /// 
-impl<'a, Base, Output> fmt::Debug for Automaton<'a, Base, Output>
+impl<'a, F> fmt::Debug for Automaton<'a, F>
     where
-        Base : 'a + fmt::Debug + ?Sized,
-        Output : 'a,
+        F : Family + 'a,
+        F::Base : fmt::Debug,
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
         formatter.debug_struct("Automaton")
-            .field("current_mode", &self.deref())
+            .field("current_mode", &self.borrow_mode())
             .finish()
     }
 }
 
-impl<'a, Base, Output> fmt::Display for Automaton<'a, Base, Output>
+impl<'a, F> fmt::Display for Automaton<'a, F>
     where
-        Base : 'a + fmt::Display + ?Sized,
-        Output : 'a,
+        F : Family + 'a,
+        F::Base : fmt::Display,
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.deref())
+        write!(formatter, "{}", self.borrow_mode())
     }
 }

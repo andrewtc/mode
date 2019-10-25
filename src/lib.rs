@@ -132,7 +132,9 @@
 //! that demonstrates how to use `Automaton` and `Mode` to implement a simple state machine, see `examples/counter.rs`.
 //! 
 mod automaton;
+mod family;
 mod mode;
 
 pub use self::automaton::*;
+pub use self::family::*;
 pub use self::mode::*;

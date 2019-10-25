@@ -4,7 +4,19 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use mode::{Automaton, Mode};
+use mode::{Automaton, Family, Mode};
+
+/// This unit struct represents a group of all `Mode`s that can be used with the same Automaton. By implementing
+/// `Family`, we can specify common `Base` and `Output` types for all Modes in this Family.
+struct ActivityFamily;
+
+impl Family for ActivityFamily {
+    // This is the public interface that will be exposed by the Automaton for all Modes in this Family.
+    type Base = dyn Activity;
+
+    // This is the type that will be returned by Automaton::transition() for all Modes in this Family.
+    type Output = ();
+}
 
 // This trait will be used as the Base type for the Automaton, defining a common interface
 // for all states.
@@ -12,7 +24,7 @@ trait Activity {
     fn update(&mut self);
 }
 
-type ActivityMode<'a> = dyn Mode<'a, Base = dyn Activity + 'a, Output = ()> + 'a;
+type ActivityMode<'a> = dyn Mode<'a, Family = ActivityFamily> + 'a;
 
 // Each state in the state machine implements both Activity (the Base type) and Mode.
 struct Working {
@@ -27,11 +39,10 @@ impl Activity for Working {
 }
 
 impl<'a> Mode<'a> for Working {
-    type Base = dyn Activity + 'a;
-    type Output = ();
+    type Family = ActivityFamily;
 
-    fn as_base(&self) -> &Self::Base { self }
-    fn as_base_mut(&mut self) -> &mut Self::Base { self }
+    fn as_base(&self) -> &<Self::Family as Family>::Base { self }
+    fn as_base_mut(&mut self) -> &mut <Self::Family as Family>::Base { self }
 
     // This function allows the current Mode to swap to another Mode, when ready.
     fn transition(self : Box<Self>) -> (Box<ActivityMode<'a>>, ()) {
@@ -58,11 +69,10 @@ impl Activity for Eating {
 }
 
 impl<'a> Mode<'a> for Eating {
-    type Base = dyn Activity + 'a;
-    type Output = ();
+    type Family = ActivityFamily;
 
-    fn as_base(&self) -> &Self::Base { self }
-    fn as_base_mut(&mut self) -> &mut Self::Base { self }
+    fn as_base(&self) -> &<Self::Family as Family>::Base { self }
+    fn as_base_mut(&mut self) -> &mut <Self::Family as Family>::Base { self }
 
     fn transition(self : Box<Self>) -> (Box<ActivityMode<'a>>, ()) {
         if self.calories_consumed >= 500 {
@@ -91,11 +101,10 @@ impl Activity for Sleeping {
 }
 
 impl<'a> Mode<'a> for Sleeping {
-    type Base = dyn Activity + 'a;
-    type Output = ();
+    type Family = ActivityFamily;
 
-    fn as_base(&self) -> &Self::Base { self }
-    fn as_base_mut(&mut self) -> &mut Self::Base { self }
+    fn as_base(&self) -> &<Self::Family as Family>::Base { self }
+    fn as_base_mut(&mut self) -> &mut <Self::Family as Family>::Base { self }
 
     fn transition(self : Box<Self>) -> (Box<ActivityMode<'a>>, ()) {
         if self.hours_rested >= 8 {
