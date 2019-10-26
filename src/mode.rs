@@ -99,4 +99,4 @@ pub trait Mode<'a> {
 }
 
 /// Shorthand for a `Mode` that is compatible with the specified lifetime `'a` and `Family` type `F`.
-pub type ModeFor<'a, F> = dyn Mode<'a, Family = F> + 'a;
+pub type ModeIn<'a, F> = dyn Mode<'a, Family = F> + 'a;

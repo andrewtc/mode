@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::{Family, Mode, ModeFor};
+use crate::{Family, Mode, ModeIn};
 use std::{convert::{AsRef, AsMut}, fmt};
 use std::ops::{Deref, DerefMut};
 
@@ -133,7 +133,7 @@ use std::ops::{Deref, DerefMut};
 pub struct Automaton<'a, F>
     where F : Family + 'a
 {
-    current_mode : Option<Box<ModeFor<'a, F>>>,
+    current_mode : Option<Box<ModeIn<'a, F>>>,
 }
 
 impl<'a, F> Automaton<'a, F>
@@ -164,7 +164,7 @@ impl<'a, F> Automaton<'a, F>
 }
 
 impl<'a, F> Automaton<'a, F>
-    where F : Family<Output = Box<ModeFor<'a, F>>> + 'a
+    where F : Family<Output = Box<ModeIn<'a, F>>> + 'a
 {
     /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
     /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
@@ -189,7 +189,7 @@ impl<'a, F> Automaton<'a, F>
 
 impl<'a, F, R> Automaton<'a, F>
     where
-        F : Family<Output = (Box<ModeFor<'a, F>>, R)> + 'a,
+        F : Family<Output = (Box<ModeIn<'a, F>>, R)> + 'a,
         R : 'a,
 {
     /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a

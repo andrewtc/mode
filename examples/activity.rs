@@ -4,23 +4,21 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use mode::{Automaton, Family, Mode, ModeFor};
+use mode::{Automaton, Family, Mode, ModeIn};
 use std::marker::PhantomData;
 
 // This meta-`struct` represents a group of all `Mode`s that can be used with the same Automaton. By implementing
 // `Family`, we can specify common `Base` and `Output` types for all Modes in this Family. The important thing to note
 // is that it will never be instantiated. It only exists to group a set of `Mode`s together.
 // 
-struct ActivityFamily<'a> {
-    _phantom : PhantomData<&'a ()>,
-}
+struct ActivityFamily<'a> { __ : PhantomData<&'a ()> }
 
 impl<'a> Family for ActivityFamily<'a> {
     // This is the public interface that will be exposed by the Automaton for all Modes in this Family.
     type Base = dyn Activity;
 
     // This is the type that will be returned by Automaton::transition() for all Modes in this Family.
-    type Output = Box<ModeFor<'a, Self>>;
+    type Output = Box<ModeIn<'a, Self>>;
 }
 
 // This trait will be used as the Base type for the Automaton, defining a common interface
@@ -48,7 +46,7 @@ impl<'a> Mode<'a> for Working {
     fn as_base_mut(&mut self) -> &mut <Self::Family as Family>::Base { self }
 
     // This function allows the current Mode to swap to another Mode, when ready.
-    fn transition(self : Box<Self>) -> Box<ModeFor<'a, ActivityFamily<'a>>> {
+    fn transition(self : Box<Self>) -> Box<ModeIn<'a, ActivityFamily<'a>>> {
         if self.hours_worked == 4 || self.hours_worked >= 8 {
             // To swap to another Mode, a Transition function is returned, which will consume
             // the current Mode and return a new Mode to be swapped in as active.
@@ -77,7 +75,7 @@ impl<'a> Mode<'a> for Eating {
     fn as_base(&self) -> &<Self::Family as Family>::Base { self }
     fn as_base_mut(&mut self) -> &mut <Self::Family as Family>::Base { self }
 
-    fn transition(self : Box<Self>) -> Box<ModeFor<'a, ActivityFamily<'a>>> {
+    fn transition(self : Box<Self>) -> Box<ModeIn<'a, ActivityFamily<'a>>> {
         if self.calories_consumed >= 500 {
             if self.hours_worked >= 8 {
                 println!("Time for bed!");
@@ -109,7 +107,7 @@ impl<'a> Mode<'a> for Sleeping {
     fn as_base(&self) -> &<Self::Family as Family>::Base { self }
     fn as_base_mut(&mut self) -> &mut <Self::Family as Family>::Base { self }
 
-    fn transition(self : Box<Self>) -> Box<ModeFor<'a, ActivityFamily<'a>>> {
+    fn transition(self : Box<Self>) -> Box<ModeIn<'a, ActivityFamily<'a>>> {
         if self.hours_rested >= 8 {
             println!("Time for breakfast!");
             Box::new(Eating { hours_worked: 0, calories_consumed: 0 })
