@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::{Family, Mode};
+use crate::{Family, Mode, ModeFor};
 use std::{convert::{AsRef, AsMut}, fmt};
 use std::ops::{Deref, DerefMut};
 
@@ -133,7 +133,7 @@ use std::ops::{Deref, DerefMut};
 pub struct Automaton<'a, F>
     where F : Family + 'a
 {
-    current_mode : Option<Box<dyn Mode<'a, Family = F> + 'a>>,
+    current_mode : Option<Box<ModeFor<'a, F>>>,
 }
 
 impl<'a, F> Automaton<'a, F>
@@ -149,26 +149,6 @@ impl<'a, F> Automaton<'a, F>
             current_mode : Some(initial_mode),
         }
     }
-    
-    /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
-    /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
-    /// `Mode` it returns as a result.
-    /// 
-    /// For convenience, this function returns a `bool` representing whether a `Transition` was performed or not. A
-    /// result of `true` indicates that the `Automaton` transitioned to another `Mode`. If no `Transition` was performed
-    /// and the previous `Mode` is still active, returns `false`.
-    /// 
-    /// See [`Transition`](trait.Transition.html) and
-    /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
-    /// 
-    pub fn transition(this : &mut Self) -> F::Output {
-        let (next_mode, result) =
-            this.current_mode.take()
-                .expect("Cannot handle transition because another transition is already taking place!")
-                .transition();
-        this.current_mode = Some(next_mode);
-        result
-    }
 
     fn borrow_mode(&self) -> &F::Base {
         self.current_mode.as_ref()
@@ -180,6 +160,57 @@ impl<'a, F> Automaton<'a, F>
         self.current_mode.as_mut()
             .expect("Cannot borrow current Mode because a transition is taking place!")
             .as_base_mut()
+    }
+}
+
+impl<'a, F> Automaton<'a, F>
+    where F : Family<Output = Box<ModeFor<'a, F>>> + 'a
+{
+    /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
+    /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
+    /// `Mode` it returns as a result.
+    /// 
+    /// For convenience, this function returns a `bool` representing whether a `Transition` was performed or not. A
+    /// result of `true` indicates that the `Automaton` transitioned to another `Mode`. If no `Transition` was performed
+    /// and the previous `Mode` is still active, returns `false`.
+    /// 
+    /// See [`Transition`](trait.Transition.html) and
+    /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
+    /// 
+    pub fn transition(this : &mut Self) {
+        let next_mode =
+            this.current_mode.take()
+                .expect("Cannot handle transition because another transition is already taking place!")
+                .transition()
+                .into();
+        this.current_mode = Some(next_mode);
+    }
+}
+
+impl<'a, F, R> Automaton<'a, F>
+    where
+        F : Family<Output = (Box<ModeFor<'a, F>>, R)> + 'a,
+        R : 'a,
+{
+    /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
+    /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
+    /// `Mode` it returns as a result.
+    /// 
+    /// For convenience, this function returns a `bool` representing whether a `Transition` was performed or not. A
+    /// result of `true` indicates that the `Automaton` transitioned to another `Mode`. If no `Transition` was performed
+    /// and the previous `Mode` is still active, returns `false`.
+    /// 
+    /// See [`Transition`](trait.Transition.html) and
+    /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
+    /// 
+    pub fn transition_with_result(this : &mut Self) -> R {
+        let (next_mode, result) =
+            this.current_mode.take()
+                .expect("Cannot handle transition because another transition is already taking place!")
+                .transition()
+                .into();
+        this.current_mode = Some(next_mode);
+        result
     }
 }
 

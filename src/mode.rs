@@ -95,5 +95,8 @@ pub trait Mode<'a> {
     /// 
     /// See [`Transition`](trait.Transition.html) for more details.
     /// 
-    fn transition(self : Box<Self>) -> (Box<dyn Mode<'a, Family = Self::Family> + 'a>, <Self::Family as Family>::Output);
+    fn transition(self : Box<Self>) -> <Self::Family as Family>::Output;
 }
+
+/// Shorthand for a `Mode` that is compatible with the specified lifetime `'a` and `Family` type `F`.
+pub type ModeFor<'a, F> = dyn Mode<'a, Family = F> + 'a;
