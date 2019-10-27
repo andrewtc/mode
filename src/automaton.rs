@@ -150,13 +150,13 @@ impl<'a, F> Automaton<'a, F>
         }
     }
 
-    fn borrow_mode(&self) -> &F::Base {
+    pub fn borrow_mode(&self) -> &F::Base {
         self.current_mode.as_ref()
             .expect("Cannot borrow current Mode because a transition is taking place!")
             .as_base()
     }
 
-    fn borrow_mode_mut(&mut self) -> &mut F::Base {
+    pub fn borrow_mode_mut(&mut self) -> &mut F::Base {
         self.current_mode.as_mut()
             .expect("Cannot borrow current Mode because a transition is taking place!")
             .as_base_mut()
