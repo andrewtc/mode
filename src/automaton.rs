@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::{Family, Mode, ModeIn};
+use crate::{Family, Swap};
 use std::{convert::{AsRef, AsMut}, fmt};
 use std::ops::{Deref, DerefMut};
 
@@ -45,7 +45,7 @@ use std::ops::{Deref, DerefMut};
 ///     type Base = Self;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
+///     fn get_transition(&mut self) -> Option<TransitionBox<Self>> {
 ///         if self.step > 0 {
 ///             // Transition to another IncrementMode with a lower step amount.
 ///             Some(Box::new(|previous : Self| {
@@ -108,10 +108,10 @@ use std::ops::{Deref, DerefMut};
 /// # }
 /// # 
 /// # impl<'a> Mode<'a> for SomeMode {
-/// #     type Base = MyMode + 'a;
+/// #     type Base = MyMode;
 /// #     fn as_base(&self) -> &Self::Base { self }
 /// #     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-/// #     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> { None }
+/// #     fn get_transition(&mut self) -> Option<TransitionBox<Self>> { None }
 /// # }
 /// # 
 /// // Use with_initial_mode() to create the Automaton with an initial state.
@@ -130,67 +130,55 @@ use std::ops::{Deref, DerefMut};
 /// automaton.perform_transitions();
 /// ```
 /// 
-pub struct Automaton<'a, F>
-    where F : Family + 'a
+pub struct Automaton<F>
+    where F : Family + ?Sized
 {
-    current_mode : Option<Box<ModeIn<'a, F>>>,
+    mode : Option<F::Mode>,
 }
 
-impl<'a, F> Automaton<'a, F>
-    where F : Family + 'a
+impl<F> Automaton<F>
+    where F : Family + ?Sized
 {
-    /// Creates a new `Automaton` with the specified `initial_mode`, which will be the active `Mode` for the `Automaton`
+    /// Creates a new `Automaton` with the specified `mode`, which will be the initial active `Mode` for the `Automaton`
     /// that is returned.
     /// 
-    pub fn with_initial_mode<M>(initial_mode : Box<M>) -> Self
-        where M : Mode<'a, Family = F> + 'a
+    pub fn with_mode<M>(mode : M) -> Self
+        where M : Into<F::Mode>
     {
         Self {
-            current_mode : Some(initial_mode),
+            mode : Some(mode.into()),
         }
     }
-
-    pub fn borrow_mode(&self) -> &F::Base {
-        self.current_mode.as_ref()
-            .expect("Cannot borrow current Mode because a transition is taking place!")
-            .as_base()
-    }
-
-    pub fn borrow_mode_mut(&mut self) -> &mut F::Base {
-        self.current_mode.as_mut()
-            .expect("Cannot borrow current Mode because a transition is taking place!")
-            .as_base_mut()
-    }
 }
 
-impl<'a, F> Automaton<'a, F>
-    where F : Family<Output = Box<ModeIn<'a, F>>> + 'a
-{
-    /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
-    /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
-    /// `Mode` it returns as a result.
-    /// 
-    /// For convenience, this function returns a `bool` representing whether a `Transition` was performed or not. A
-    /// result of `true` indicates that the `Automaton` transitioned to another `Mode`. If no `Transition` was performed
-    /// and the previous `Mode` is still active, returns `false`.
-    /// 
-    /// See [`Transition`](trait.Transition.html) and
-    /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
-    /// 
-    pub fn transition(this : &mut Self) {
-        let next_mode =
-            this.current_mode.take()
-                .expect("Cannot handle transition because another transition is already taking place!")
-                .transition()
-                .into();
-        this.current_mode = Some(next_mode);
-    }
-}
-
-impl<'a, F, R> Automaton<'a, F>
+impl<F> Automaton<F>
     where
-        F : Family<Output = (Box<ModeIn<'a, F>>, R)> + 'a,
-        R : 'a,
+        F : Family + ?Sized,
+        F::Mode : AsRef<F::Base>,
+{
+    pub fn borrow_mode(&self) -> &F::Base {
+        self.mode.as_ref()
+            .expect("Cannot borrow current Mode because another swap is already taking place!")
+            .as_ref()
+    }
+}
+
+impl<F> Automaton<F>
+    where
+        F : Family + ?Sized,
+        F::Mode : AsMut<F::Base>,
+{
+    pub fn borrow_mode_mut(&mut self) -> &mut F::Base {
+        self.mode.as_mut()
+            .expect("Cannot borrow current Mode because another swap is already taking place!")
+            .as_mut()
+    }
+}
+
+impl<F, M> Automaton<F>
+    where
+        F : Family<Mode = M, Output = M> + ?Sized,
+        M : Swap<Family = F>,
 {
     /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
     /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
@@ -203,19 +191,46 @@ impl<'a, F, R> Automaton<'a, F>
     /// See [`Transition`](trait.Transition.html) and
     /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
     /// 
-    pub fn transition_with_result(this : &mut Self) -> R {
-        let (next_mode, result) =
-            this.current_mode.take()
-                .expect("Cannot handle transition because another transition is already taking place!")
-                .transition()
+    pub fn next(this : &mut Self) {
+        let next =
+            this.mode.take()
+                .expect("Cannot swap to next Mode because another swap is already taking place!")
+                .swap();
+        this.mode = Some(next);
+    }
+}
+
+impl<F, M, R> Automaton<F>
+    where
+        F : Family<Mode = M, Output = (M, R)> + ?Sized,
+        M : Swap<Family = F>,
+{
+    /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
+    /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
+    /// `Mode` it returns as a result.
+    /// 
+    /// For convenience, this function returns a `bool` representing whether a `Transition` was performed or not. A
+    /// result of `true` indicates that the `Automaton` transitioned to another `Mode`. If no `Transition` was performed
+    /// and the previous `Mode` is still active, returns `false`.
+    /// 
+    /// See [`Transition`](trait.Transition.html) and
+    /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
+    /// 
+    pub fn next_with_result(this : &mut Self) -> R {
+        let (next, result) =
+            this.mode.take()
+                .expect("Cannot swap to next Mode because another swap is already taking place!")
+                .swap()
                 .into();
-        this.current_mode = Some(next_mode);
+        this.mode = Some(next);
         result
     }
 }
 
-impl<'a, F> AsRef<F::Base> for Automaton<'a, F>
-    where F : Family + 'a
+impl<F> AsRef<F::Base> for Automaton<F>
+    where
+        F : Family + ?Sized,
+        F::Mode : AsRef<F::Base>,
 {
     /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be
     /// called on the inner `Mode`.
@@ -225,16 +240,20 @@ impl<'a, F> AsRef<F::Base> for Automaton<'a, F>
     }
 }
 
-impl<'a, F> AsMut<F::Base> for Automaton<'a, F>
-    where F : Family + 'a
+impl<F> AsMut<F::Base> for Automaton<F>
+    where
+        F : Family + ?Sized,
+        F::Mode : AsMut<F::Base>,
 {
     fn as_mut(&mut self) -> &mut <F as Family>::Base {
         self.borrow_mode_mut()
     }
 }
 
-impl<'a, F> Deref for Automaton<'a, F>
-    where F : Family + 'a
+impl<F> Deref for Automaton<F>
+    where
+        F : Family + ?Sized,
+        F::Mode : AsRef<F::Base>,
 {
     type Target = F::Base;
 
@@ -246,8 +265,10 @@ impl<'a, F> Deref for Automaton<'a, F>
     }
 }
 
-impl<'a, F> DerefMut for Automaton<'a, F>
-    where F : Family + 'a
+impl<F> DerefMut for Automaton<F>
+    where
+        F : Family + ?Sized,
+        F::Mode : AsRef<F::Base> + AsMut<F::Base>,
 {
     /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`, allowing mutable functions to be
     /// called on the inner `Mode`.
@@ -257,8 +278,8 @@ impl<'a, F> DerefMut for Automaton<'a, F>
     }
 }
 
-impl<'a, F> Automaton<'a, F>
-    where F : Family + Default + 'a
+impl<F> Automaton<F>
+    where F : Family + ?Sized + Default
 {
     /// Creates a new `Automaton` with a default `Mode` instance as the active `Mode`.
     /// 
@@ -276,7 +297,7 @@ impl<'a, F> Automaton<'a, F>
     ///     type Base = Self;
     ///     fn as_base(&self) -> &Self { self }
     ///     fn as_base_mut(&mut self) -> &mut Self { self }
-    ///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
+    ///     fn get_transition(&mut self) -> Option<TransitionBox<Self>> {
     ///         // TODO: Logic for transitioning between states goes here.
     ///         Some(Box::new(
     ///             |previous : Self| {
@@ -306,13 +327,13 @@ impl<'a, F> Automaton<'a, F>
     /// 
     pub fn new() -> Self {
         Self {
-            current_mode : Default::default(),
+            mode : Default::default(),
         }
     }
 }
 
-impl<'a, F> Default for Automaton<'a, F>
-    where F : Family + Default + 'a
+impl<F> Default for Automaton<F>
+    where F : Family + ?Sized + Default
 {
     /// Creates a new `Automaton` with the default `Mode` active. This is equivalent to calling `Automaton::new()`.
     /// 
@@ -341,31 +362,33 @@ impl<'a, F> Default for Automaton<'a, F>
 /// impl MyBase for MyMode { } // TODO: Implement common interface.
 /// 
 /// impl<'a> Mode<'a> for MyMode {
-///     type Base = MyBase + 'a;
+///     type Base = MyBase;
 ///     fn as_base(&self) -> &Self::Base { self }
 ///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> { None } // TODO
+///     fn get_transition(&mut self) -> Option<TransitionBox<Self>> { None } // TODO
 /// }
 /// 
 /// let automaton = Automaton::with_initial_mode(MyMode { foo: 3, bar: "Hello, World!" });
 /// dbg!(automaton);
 /// ```
 /// 
-impl<'a, F> fmt::Debug for Automaton<'a, F>
+impl<F> fmt::Debug for Automaton<F>
     where
-        F : Family + 'a,
+        F : Family + ?Sized,
+        F::Mode : AsRef<F::Base>,
         F::Base : fmt::Debug,
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
         formatter.debug_struct("Automaton")
-            .field("current_mode", &self.borrow_mode())
+            .field("mode", &self.borrow_mode())
             .finish()
     }
 }
 
-impl<'a, F> fmt::Display for Automaton<'a, F>
+impl<F> fmt::Display for Automaton<F>
     where
-        F : Family + 'a,
+        F : Family + ?Sized,
+        F::Mode : AsRef<F::Base>,
         F::Base : fmt::Display,
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {

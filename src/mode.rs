@@ -77,16 +77,8 @@ use crate::Family;
 /// becomes stable, since it will provide a way for `struct`s to express that a generic parameter must be convertible to
 /// a particular type.
 /// 
-pub trait Mode<'a> {
-    type Family : Family + 'a;
-
-    /// Returns an immutable reference to this `Mode` as a `&Self::Base`.
-    /// 
-    fn as_base(&self) -> &<Self::Family as Family>::Base;
-
-    /// Returns a mutable reference to this `Mode` as a `&mut Self::Base`.
-    /// 
-    fn as_base_mut(&mut self) -> &mut <Self::Family as Family>::Base;
+pub trait Swap {
+    type Family : Family + ?Sized;
 
     /// Every time `perform_transitions()` is called on an `Automaton`, This function will be called on the current
     /// `Mode` to determine whether it wants another `Mode` to become active. If this function returns `None`, the
@@ -95,8 +87,23 @@ pub trait Mode<'a> {
     /// 
     /// See [`Transition`](trait.Transition.html) for more details.
     /// 
-    fn transition(self : Box<Self>) -> <Self::Family as Family>::Output;
+    fn swap(self) -> <Self::Family as Family>::Output;
 }
 
-/// Shorthand for a `Mode` that is compatible with the specified lifetime `'a` and `Family` type `F`.
-pub type ModeIn<'a, F> = dyn Mode<'a, Family = F> + 'a;
+pub trait SwapBox {
+    type Family : Family + ?Sized;
+
+    fn swap_box(self : Box<Self>) -> <Self::Family as Family>::Output;
+}
+
+impl<T, F> Swap for Box<T>
+    where
+        F : Family + ?Sized,
+        T : SwapBox<Family = F> + ?Sized,
+{
+    type Family = F;
+
+    fn swap(self) -> <Self::Family as Family>::Output {
+        self.swap_box()
+    }
+}
