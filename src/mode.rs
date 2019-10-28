@@ -5,6 +5,7 @@
 // modified, or distributed except according to those terms.
 
 use crate::Family;
+use std::{sync::Arc, rc::Rc};
 
 /// Trait that represents a state within an `Automaton`.
 /// 
@@ -105,5 +106,41 @@ impl<T, F> Swap for Box<T>
 
     fn swap(self) -> <Self::Family as Family>::Output {
         self.swap_box()
+    }
+}
+
+pub trait SwapRc {
+    type Family : Family + ?Sized;
+
+    fn swap_rc(self : Rc<Self>) -> <Self::Family as Family>::Output;
+}
+
+impl<T, F> Swap for Rc<T>
+    where
+        F : Family + ?Sized,
+        T : SwapRc<Family = F> + ?Sized,
+{
+    type Family = F;
+
+    fn swap(self) -> <Self::Family as Family>::Output {
+        self.swap_rc()
+    }
+}
+
+pub trait SwapArc {
+    type Family : Family + ?Sized;
+
+    fn swap_arc(self : Arc<Self>) -> <Self::Family as Family>::Output;
+}
+
+impl<T, F> Swap for Arc<T>
+    where
+        F : Family + ?Sized,
+        T : SwapArc<Family = F> + ?Sized,
+{
+    type Family = F;
+
+    fn swap(self) -> <Self::Family as Family>::Output {
+        self.swap_arc()
     }
 }
