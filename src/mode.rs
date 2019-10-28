@@ -5,7 +5,6 @@
 // modified, or distributed except according to those terms.
 
 use crate::Family;
-use std::{sync::Arc, rc::Rc};
 
 /// Trait that represents a state within an `Automaton`.
 /// 
@@ -78,7 +77,7 @@ use std::{sync::Arc, rc::Rc};
 /// becomes stable, since it will provide a way for `struct`s to express that a generic parameter must be convertible to
 /// a particular type.
 /// 
-pub trait Swap {
+pub trait Mode {
     type Family : Family + ?Sized;
 
     /// Every time `perform_transitions()` is called on an `Automaton`, This function will be called on the current
@@ -91,56 +90,70 @@ pub trait Swap {
     fn swap(self) -> <Self::Family as Family>::Output;
 }
 
-pub trait SwapBox {
-    type Family : Family + ?Sized;
+pub mod boxed {
+    use crate::Family;
 
-    fn swap_box(self : Box<Self>) -> <Self::Family as Family>::Output;
-}
+    pub trait Mode {
+        type Family : Family + ?Sized;
 
-impl<T, F> Swap for Box<T>
-    where
-        F : Family + ?Sized,
-        T : SwapBox<Family = F> + ?Sized,
-{
-    type Family = F;
+        fn swap(self : Box<Self>) -> <Self::Family as Family>::Output;
+    }
 
-    fn swap(self) -> <Self::Family as Family>::Output {
-        self.swap_box()
+    impl<T, F> crate::Mode for Box<T>
+        where
+            F : Family + ?Sized,
+            T : self::Mode<Family = F> + ?Sized,
+    {
+        type Family = F;
+
+        fn swap(self) -> <Self::Family as Family>::Output {
+            self.swap()
+        }
     }
 }
 
-pub trait SwapRc {
-    type Family : Family + ?Sized;
+pub mod rc {
+    use crate::Family;
+    use std::rc::Rc;
 
-    fn swap_rc(self : Rc<Self>) -> <Self::Family as Family>::Output;
-}
+    pub trait Mode {
+        type Family : Family + ?Sized;
 
-impl<T, F> Swap for Rc<T>
-    where
-        F : Family + ?Sized,
-        T : SwapRc<Family = F> + ?Sized,
-{
-    type Family = F;
+        fn swap(self : Rc<Self>) -> <Self::Family as Family>::Output;
+    }
 
-    fn swap(self) -> <Self::Family as Family>::Output {
-        self.swap_rc()
+    impl<T, F> crate::Mode for Rc<T>
+        where
+            F : Family + ?Sized,
+            T : self::Mode<Family = F> + ?Sized,
+    {
+        type Family = F;
+
+        fn swap(self) -> <Self::Family as Family>::Output {
+            self.swap()
+        }
     }
 }
 
-pub trait SwapArc {
-    type Family : Family + ?Sized;
+pub mod sync {
+    use crate::Family;
+    use std::sync::Arc;
 
-    fn swap_arc(self : Arc<Self>) -> <Self::Family as Family>::Output;
-}
+    pub trait Mode {
+        type Family : Family + ?Sized;
 
-impl<T, F> Swap for Arc<T>
-    where
-        F : Family + ?Sized,
-        T : SwapArc<Family = F> + ?Sized,
-{
-    type Family = F;
+        fn swap(self : Arc<Self>) -> <Self::Family as Family>::Output;
+    }
 
-    fn swap(self) -> <Self::Family as Family>::Output {
-        self.swap_arc()
+    impl<T, F> crate::Mode for Arc<T>
+        where
+            F : Family + ?Sized,
+            T : self::Mode<Family = F> + ?Sized,
+    {
+        type Family = F;
+
+        fn swap(self) -> <Self::Family as Family>::Output {
+            self.swap()
+        }
     }
 }

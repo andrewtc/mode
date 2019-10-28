@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use mode::{Automaton, Family, Swap};
+use mode::{Automaton, Family, Mode};
 use std::marker::PhantomData;
 
 const HEAD : u16 = 8;
@@ -26,7 +26,7 @@ struct StateWithContext<'a> {
     tape : &'a mut u16,
 }
 
-impl<'a> Swap for StateWithContext<'a> {
+impl<'a> Mode for StateWithContext<'a> {
     type Family = StateFamily<'a>;
     fn swap(mut self) -> (Self, bool) {
         use PrintOp::*;

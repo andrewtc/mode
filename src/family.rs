@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::Swap;
+use crate::Mode;
 
 pub trait Family {
     /// Represents the user-facing interface for the `Mode` that will be exposed via the `Automaton`. In order to be
@@ -14,7 +14,7 @@ pub trait Family {
     /// 
     type Base : ?Sized;
 
-    type Mode : Swap<Family = Self>;
+    type Mode : Mode<Family = Self>;
 
     type Output;
 }

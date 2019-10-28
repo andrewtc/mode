@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::{Family, Swap};
+use crate::{Family, Mode};
 use std::{convert::{AsRef, AsMut}, fmt};
 use std::ops::{Deref, DerefMut};
 
@@ -178,7 +178,7 @@ impl<F> Automaton<F>
 impl<F, M> Automaton<F>
     where
         F : Family<Mode = M, Output = M> + ?Sized,
-        M : Swap<Family = F>,
+        M : Mode<Family = F>,
 {
     /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
     /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
@@ -203,7 +203,7 @@ impl<F, M> Automaton<F>
 impl<F, M, R> Automaton<F>
     where
         F : Family<Mode = M, Output = (M, R)> + ?Sized,
-        M : Swap<Family = F>,
+        M : Mode<Family = F>,
 {
     /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
     /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
