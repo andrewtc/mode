@@ -5,7 +5,11 @@
 // modified, or distributed except according to those terms.
 
 use crate::{Family, Mode};
-use std::{convert::{AsRef, AsMut}, fmt};
+use std::{
+    convert::{AsRef, AsMut},
+    borrow::{Borrow, BorrowMut},
+    fmt
+};
 use std::ops::{Deref, DerefMut};
 
 /// Represents a state machine over a set of `Mode`s that can be referenced via some common interface `Base`.
@@ -154,30 +158,30 @@ impl<F> Automaton<F>
 impl<F> Automaton<F>
     where
         F : Family + ?Sized,
-        F::Mode : AsRef<F::Base>,
+        F::Mode : Borrow<F::Base>,
 {
     pub fn borrow_mode(&self) -> &F::Base {
         self.mode.as_ref()
             .expect("Cannot borrow current Mode because another swap is already taking place!")
-            .as_ref()
+            .borrow()
     }
 }
 
 impl<F> Automaton<F>
     where
         F : Family + ?Sized,
-        F::Mode : AsMut<F::Base>,
+        F::Mode : BorrowMut<F::Base>,
 {
     pub fn borrow_mode_mut(&mut self) -> &mut F::Base {
         self.mode.as_mut()
             .expect("Cannot borrow current Mode because another swap is already taking place!")
-            .as_mut()
+            .borrow_mut()
     }
 }
 
 impl<F, M> Automaton<F>
     where
-        F : Family<Mode = M, Output = M> + ?Sized,
+        F : Family<Mode = M, Input = (), Output = M> + ?Sized,
         M : Mode<Family = F>,
 {
     /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
@@ -192,35 +196,44 @@ impl<F, M> Automaton<F>
     /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
     /// 
     pub fn next(this : &mut Self) {
+        Automaton::next_with_input(this, ())
+    }
+}
+
+impl<F, M> Automaton<F>
+    where
+        F : Family<Mode = M, Output = M> + ?Sized,
+        M : Mode<Family = F>,
+{
+    pub fn next_with_input(this : &mut Self, input : F::Input) {
         let next =
             this.mode.take()
                 .expect("Cannot swap to next Mode because another swap is already taking place!")
-                .swap();
+                .swap(input);
         this.mode = Some(next);
     }
 }
 
-impl<F, M, R> Automaton<F>
+impl<F, M, Output> Automaton<F>
     where
-        F : Family<Mode = M, Output = (M, R)> + ?Sized,
+        F : Family<Mode = M, Input = (), Output = (M, Output)> + ?Sized,
         M : Mode<Family = F>,
 {
-    /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
-    /// `Transition` is returned, the `Transition` callback will be called on the current `Mode`, swapping in whichever
-    /// `Mode` it returns as a result.
-    /// 
-    /// For convenience, this function returns a `bool` representing whether a `Transition` was performed or not. A
-    /// result of `true` indicates that the `Automaton` transitioned to another `Mode`. If no `Transition` was performed
-    /// and the previous `Mode` is still active, returns `false`.
-    /// 
-    /// See [`Transition`](trait.Transition.html) and
-    /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
-    /// 
-    pub fn next_with_result(this : &mut Self) -> R {
+    pub fn next_with_output(this : &mut Self) -> Output {
+        Automaton::next_with_input_output(this, ())
+    }
+}
+
+impl<F, M, Output> Automaton<F>
+    where
+        F : Family<Mode = M, Output = (M, Output)> + ?Sized,
+        M : Mode<Family = F>,
+{
+    pub fn next_with_input_output(this : &mut Self, input : F::Input) -> Output {
         let (next, result) =
             this.mode.take()
                 .expect("Cannot swap to next Mode because another swap is already taking place!")
-                .swap()
+                .swap(input)
                 .into();
         this.mode = Some(next);
         result
@@ -230,7 +243,7 @@ impl<F, M, R> Automaton<F>
 impl<F> AsRef<F::Base> for Automaton<F>
     where
         F : Family + ?Sized,
-        F::Mode : AsRef<F::Base>,
+        F::Mode : Borrow<F::Base>,
 {
     /// Returns an immutable reference to the current `Mode` as a `&Self::Base`, allowing immutable functions to be
     /// called on the inner `Mode`.
@@ -243,7 +256,7 @@ impl<F> AsRef<F::Base> for Automaton<F>
 impl<F> AsMut<F::Base> for Automaton<F>
     where
         F : Family + ?Sized,
-        F::Mode : AsMut<F::Base>,
+        F::Mode : BorrowMut<F::Base>,
 {
     fn as_mut(&mut self) -> &mut <F as Family>::Base {
         self.borrow_mode_mut()
@@ -253,7 +266,7 @@ impl<F> AsMut<F::Base> for Automaton<F>
 impl<F> Deref for Automaton<F>
     where
         F : Family + ?Sized,
-        F::Mode : AsRef<F::Base>,
+        F::Mode : Borrow<F::Base>,
 {
     type Target = F::Base;
 
@@ -268,7 +281,7 @@ impl<F> Deref for Automaton<F>
 impl<F> DerefMut for Automaton<F>
     where
         F : Family + ?Sized,
-        F::Mode : AsRef<F::Base> + AsMut<F::Base>,
+        F::Mode : Borrow<F::Base> + BorrowMut<F::Base>,
 {
     /// Returns a mutable reference to the current `Mode` as a `&mut Self::Base`, allowing mutable functions to be
     /// called on the inner `Mode`.
@@ -375,7 +388,7 @@ impl<F> Default for Automaton<F>
 impl<F> fmt::Debug for Automaton<F>
     where
         F : Family + ?Sized,
-        F::Mode : AsRef<F::Base>,
+        F::Mode : Borrow<F::Base>,
         F::Base : fmt::Debug,
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {
@@ -388,7 +401,7 @@ impl<F> fmt::Debug for Automaton<F>
 impl<F> fmt::Display for Automaton<F>
     where
         F : Family + ?Sized,
-        F::Mode : AsRef<F::Base>,
+        F::Mode : Borrow<F::Base>,
         F::Base : fmt::Display,
 {
     fn fmt(&self, formatter : &mut fmt::Formatter) -> fmt::Result {

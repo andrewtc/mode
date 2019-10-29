@@ -5,79 +5,70 @@
 // modified, or distributed except according to those terms.
 
 use mode::{Automaton, Family, Mode};
-use std::marker::PhantomData;
 
 const HEAD : u16 = 8;
 const MASK : u16 = 1 << HEAD;
 
-struct StateFamily<'a> { __ : PhantomData<&'a ()> }
-impl<'a> Family for StateFamily<'a> {
-    type Base = StateWithContext<'a>;
-    type Mode = StateWithContext<'a>;
-    type Output = (StateWithContext<'a>, bool);
+struct StateFamily;
+impl Family for StateFamily {
+    type Base = State;
+    type Mode = State;
+    type Input = u16; // Needs to be a RefCell instead of a mut borrow because we can't elide the lifetime.
+    type Output = (State, u16);
 }
 
 enum State { A, B, C, D, E, H }
 enum PrintOp { Clear, Print }
 enum ShiftOp { Left,  Right }
 
-struct StateWithContext<'a> {
-    state : State,
-    tape : &'a mut u16,
-}
-
-impl<'a> Mode for StateWithContext<'a> {
-    type Family = StateFamily<'a>;
-    fn swap(mut self) -> (Self, bool) {
+impl Mode for State {
+    type Family = StateFamily;
+    fn swap(self, mut tape : u16) -> (Self, u16) {
+        use State::*;
         use PrintOp::*;
         use ShiftOp::*;
 
-        println!("{:#018b}", self.tape);
-        let bit = (*self.tape & MASK) >> HEAD;
+        let bit = (tape & MASK) >> HEAD;
 
         let (next, result) =
-            match (self.state, bit) {
-                (State::A, 0) => (State::H, None),
-                (State::A, 1) => (State::B, Some((Clear, Right))),
-                (State::B, 0) => (State::C, Some((Clear, Right))),
-                (State::B, 1) => (State::B, Some((Print, Right))),
-                (State::C, 0) => (State::D, Some((Print,  Left))),
-                (State::C, 1) => (State::C, Some((Print, Right))),
-                (State::D, 0) => (State::E, Some((Clear,  Left))),
-                (State::D, 1) => (State::D, Some((Print,  Left))),
-                (State::E, 0) => (State::A, Some((Print, Right))),
-                (State::E, 1) => (State::E, Some((Print,  Left))),
-                (State::H, _) => (State::H, None),
-                            _ => unreachable!(),
+            match (self, bit) {
+                (A, 0) => (H, None),
+                (A, 1) => (B, Some((Clear, Right))),
+                (B, 0) => (C, Some((Clear, Right))),
+                (B, 1) => (B, Some((Print, Right))),
+                (C, 0) => (D, Some((Print,  Left))),
+                (C, 1) => (C, Some((Print, Right))),
+                (D, 0) => (E, Some((Clear,  Left))),
+                (D, 1) => (D, Some((Print,  Left))),
+                (E, 0) => (A, Some((Print, Right))),
+                (E, 1) => (E, Some((Print,  Left))),
+                (H, _) => (H, None),
+                (_, _) => unreachable!(),
             };
-        
-        let halt = result.is_none();
 
         if let Some((print_op, shift_op)) = result {
             match print_op {
-                Print => { *self.tape = *self.tape |  (1 << HEAD); },
-                Clear => { *self.tape = *self.tape & !(1 << HEAD); },
+                Print => { tape = tape |  (1 << HEAD); },
+                Clear => { tape = tape & !(1 << HEAD); },
             }
 
             match shift_op {
-                Left  => { *self.tape = *self.tape << 1; },
-                Right => { *self.tape = *self.tape >> 1; },
+                Left  => { tape = tape << 1; },
+                Right => { tape = tape >> 1; },
             }
         }
 
-        self.state = next;
-        (self, !halt)
+        (next, tape)
     }
 }
 
 fn main() {
     let mut tape : u16 = 0b111 << HEAD;
-    let mut automaton : Automaton<StateFamily> =
-        Automaton::with_mode(
-            StateWithContext {
-                state: State::A,
-                tape:  &mut tape,
-            });
+    let mut automaton : Automaton<StateFamily> = Automaton::with_mode(State::A);
 
-    while Automaton::next_with_result(&mut automaton) { }
+    loop {
+        println!("{:#018b}", tape);
+        tape = Automaton::next_with_input_output(&mut automaton, tape);
+        if let &State::H = automaton.borrow_mode() { break; }
+    }
 }

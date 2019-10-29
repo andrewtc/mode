@@ -18,6 +18,8 @@ impl Family for ActivityFamily {
 
     type Mode = Box<dyn Activity>;
 
+    type Input = ();
+
     // This is the type that will be returned by Automaton::transition() for all Modes in this Family.
     type Output = Box<dyn Activity>;
 }
@@ -44,7 +46,7 @@ impl boxed::Mode for Working {
     type Family = ActivityFamily;
 
     // This function allows the current Mode to swap to another Mode, when ready.
-    fn swap(self : Box<Self>) -> Box<dyn Activity> {
+    fn swap(self : Box<Self>, _input : ()) -> Box<dyn Activity> {
         if self.hours_worked == 4 || self.hours_worked >= 8 {
             // To swap to another Mode, a Transition function is returned, which will consume
             // the current Mode and return a new Mode to be swapped in as active.
@@ -70,7 +72,7 @@ impl Activity for Eating {
 impl boxed::Mode for Eating {
     type Family = ActivityFamily;
 
-    fn swap(self : Box<Self>) -> Box<dyn Activity> {
+    fn swap(self : Box<Self>, _input : ()) -> Box<dyn Activity> {
         if self.calories_consumed >= 500 {
             if self.hours_worked >= 8 {
                 println!("Time for bed!");
@@ -99,7 +101,7 @@ impl Activity for Sleeping {
 impl boxed::Mode for Sleeping {
     type Family = ActivityFamily;
 
-    fn swap(self : Box<Self>) -> Box<dyn Activity> {
+    fn swap(self : Box<Self>, _input : ()) -> Box<dyn Activity> {
         if self.hours_rested >= 8 {
             println!("Time for breakfast!");
             Box::new(Eating { hours_worked: 0, calories_consumed: 0 })
