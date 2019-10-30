@@ -16,7 +16,5 @@ pub trait Family {
 
     type Mode : Mode<Family = Self>;
 
-    type Input;
-
     type Output;
 }

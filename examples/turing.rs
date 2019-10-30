@@ -5,33 +5,44 @@
 // modified, or distributed except according to those terms.
 
 use mode::{Automaton, Family, Mode};
+use std::marker::PhantomData;
 
 const HEAD : u16 = 8;
 const MASK : u16 = 1 << HEAD;
 
-struct StateFamily;
-impl Family for StateFamily {
-    type Base = State;
-    type Mode = State;
-    type Input = u16; // Needs to be a RefCell instead of a mut borrow because we can't elide the lifetime.
-    type Output = (State, u16);
+struct StateFamily<'a> { __ : PhantomData<&'a ()> }
+impl<'a> Family for StateFamily<'a> {
+    type Base = State<'a>;
+    type Mode = State<'a>;
+    type Output = (State<'a>, bool);
 }
 
-enum State { A, B, C, D, E, H }
+#[derive(Copy, Clone, Debug)]
+enum Name { A, B, C, D, E, H }
+
+#[derive(Copy, Clone, Debug)]
 enum PrintOp { Clear, Print }
+
+#[derive(Copy, Clone, Debug)]
 enum ShiftOp { Left,  Right }
 
-impl Mode for State {
-    type Family = StateFamily;
-    fn swap(self, mut tape : u16) -> (Self, u16) {
-        use State::*;
+#[derive(Debug)]
+struct State<'a> {
+    name : Name,
+    tape : &'a mut u16,
+}
+
+impl<'a> Mode for State<'a> {
+    type Family = StateFamily<'a>;
+    fn swap(mut self) -> (Self, bool) {
+        use Name::*;
         use PrintOp::*;
         use ShiftOp::*;
 
-        let bit = (tape & MASK) >> HEAD;
+        let bit = (*self.tape & MASK) >> HEAD;
 
-        let (next, result) =
-            match (self, bit) {
+        let (next, op) =
+            match (self.name, bit) {
                 (A, 0) => (H, None),
                 (A, 1) => (B, Some((Clear, Right))),
                 (B, 0) => (C, Some((Clear, Right))),
@@ -46,29 +57,46 @@ impl Mode for State {
                 (_, _) => unreachable!(),
             };
 
-        if let Some((print_op, shift_op)) = result {
+        print!(
+            "{:016b} {:?} => {:?}, ",
+            self.tape,
+            self.name,
+            next);
+
+        if let Some(op) = op {
+            println!("{:?}, {:?}", op.0, op.1);
+        }
+        else {
+            println!("Halt");
+        }
+
+        let halt = op.is_none();
+
+        if let Some((print_op, shift_op)) = op {
             match print_op {
-                Print => { tape = tape |  (1 << HEAD); },
-                Clear => { tape = tape & !(1 << HEAD); },
+                Print => { *self.tape = *self.tape |  (1 << HEAD); },
+                Clear => { *self.tape = *self.tape & !(1 << HEAD); },
             }
 
             match shift_op {
-                Left  => { tape = tape << 1; },
-                Right => { tape = tape >> 1; },
+                Left  => { *self.tape = *self.tape << 1; },
+                Right => { *self.tape = *self.tape >> 1; },
             }
         }
 
-        (next, tape)
+        self.name = next;
+        (self, !halt)
     }
 }
 
 fn main() {
     let mut tape : u16 = 0b111 << HEAD;
-    let mut automaton : Automaton<StateFamily> = Automaton::with_mode(State::A);
+    let mut automaton : Automaton<StateFamily> =
+        Automaton::with_mode(
+            State{
+                name: Name::A,
+                tape: &mut tape,
+            });
 
-    loop {
-        println!("{:#018b}", tape);
-        tape = Automaton::next_with_input_output(&mut automaton, tape);
-        if let &State::H = automaton.borrow_mode() { break; }
-    }
+    while Automaton::next_with_output(&mut automaton) { }
 }

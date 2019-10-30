@@ -87,7 +87,7 @@ pub trait Mode {
     /// 
     /// See [`Transition`](trait.Transition.html) for more details.
     /// 
-    fn swap(self, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output;
+    fn swap(self) -> <Self::Family as Family>::Output;
 }
 
 pub mod boxed {
@@ -96,7 +96,7 @@ pub mod boxed {
     pub trait Mode {
         type Family : Family + ?Sized;
 
-        fn swap(self : Box<Self>, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output;
+        fn swap(self : Box<Self>) -> <Self::Family as Family>::Output;
     }
 
     impl<T, F> crate::Mode for Box<T>
@@ -106,8 +106,8 @@ pub mod boxed {
     {
         type Family = F;
 
-        fn swap(self, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output {
-            self.swap(input)
+        fn swap(self) -> <Self::Family as Family>::Output {
+            self.swap()
         }
     }
 }
@@ -119,7 +119,7 @@ pub mod rc {
     pub trait Mode {
         type Family : Family + ?Sized;
 
-        fn swap(self : Rc<Self>, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output;
+        fn swap(self : Rc<Self>) -> <Self::Family as Family>::Output;
     }
 
     impl<T, F> crate::Mode for Rc<T>
@@ -129,8 +129,8 @@ pub mod rc {
     {
         type Family = F;
 
-        fn swap(self, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output {
-            self.swap(input)
+        fn swap(self) -> <Self::Family as Family>::Output {
+            self.swap()
         }
     }
 }
@@ -142,7 +142,7 @@ pub mod sync {
     pub trait Mode {
         type Family : Family + ?Sized;
 
-        fn swap(self : Arc<Self>, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output;
+        fn swap(self : Arc<Self>) -> <Self::Family as Family>::Output;
     }
 
     impl<T, F> crate::Mode for Arc<T>
@@ -152,8 +152,8 @@ pub mod sync {
     {
         type Family = F;
 
-        fn swap(self, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output {
-            self.swap(input)
+        fn swap(self) -> <Self::Family as Family>::Output {
+            self.swap()
         }
     }
 }

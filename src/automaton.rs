@@ -181,7 +181,7 @@ impl<F> Automaton<F>
 
 impl<F, M> Automaton<F>
     where
-        F : Family<Mode = M, Input = (), Output = M> + ?Sized,
+        F : Family<Mode = M, Output = M> + ?Sized,
         M : Mode<Family = F>,
 {
     /// Calls `get_transition()` on the current `Mode` to determine whether it wants to transition out. If a
@@ -196,31 +196,11 @@ impl<F, M> Automaton<F>
     /// [`Mode::get_transition()`](trait.Mode.html#tymethod.get_transition) for more details.
     /// 
     pub fn next(this : &mut Self) {
-        Automaton::next_with_input(this, ())
-    }
-}
-
-impl<F, M> Automaton<F>
-    where
-        F : Family<Mode = M, Output = M> + ?Sized,
-        M : Mode<Family = F>,
-{
-    pub fn next_with_input(this : &mut Self, input : F::Input) {
         let next =
             this.mode.take()
                 .expect("Cannot swap to next Mode because another swap is already taking place!")
-                .swap(input);
+                .swap();
         this.mode = Some(next);
-    }
-}
-
-impl<F, M, Output> Automaton<F>
-    where
-        F : Family<Mode = M, Input = (), Output = (M, Output)> + ?Sized,
-        M : Mode<Family = F>,
-{
-    pub fn next_with_output(this : &mut Self) -> Output {
-        Automaton::next_with_input_output(this, ())
     }
 }
 
@@ -229,12 +209,11 @@ impl<F, M, Output> Automaton<F>
         F : Family<Mode = M, Output = (M, Output)> + ?Sized,
         M : Mode<Family = F>,
 {
-    pub fn next_with_input_output(this : &mut Self, input : F::Input) -> Output {
+    pub fn next_with_output(this : &mut Self) -> Output {
         let (next, result) =
             this.mode.take()
                 .expect("Cannot swap to next Mode because another swap is already taking place!")
-                .swap(input)
-                .into();
+                .swap();
         this.mode = Some(next);
         result
     }
