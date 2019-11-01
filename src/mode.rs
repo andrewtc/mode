@@ -6,56 +6,58 @@
 
 use crate::Family;
 
-/// Trait that represents a state within an `Automaton`.
+/// Trait that defines the transition behavior of a state within an `Automaton`.
 /// 
 /// Every `Automaton` contains a single `Mode` instance that represents the active state of the state machine. An
-/// `Automaton<Base>` can **only** switch between implementations of `Mode` of the same `Base` type. The `Automaton`
-/// only allows its active `Mode` to be accessed as a `Base` reference, so only functions exposed on the `Base` type are
-/// callable on the `Mode` from outside the `Automaton`.
+/// `Automaton<F>` can **only** switch between `Mode`s with the same `Family` type `F`. The `Automaton` only allows the
+/// active `Mode` to be accessed as a `F::Base` reference, so only functions exposed on the `Base` type are callable on
+/// the `Mode` from outside the `Automaton`.
 /// 
 /// See [`Automaton`](struct.Automaton.html) for more details.
-/// 
-/// # Transitions
-/// `Mode`s can choose to transition to any other `Mode` with the same `Base` type. This is accomplished by returning a
-/// `Transition` function from the `get_transition()` function, which will cause the parent `Automaton` to switch to
-/// another `Mode` the next time `perform_transitions()` is called.
-/// 
-/// See [`Transition`](trait.Transition.html) and
-/// [`Automaton::perform_transitions()`](struct.Automaton.html#method.perform_transitions) for more details.
 /// 
 /// # Usage
 /// ```
 /// use mode::*;
 /// 
-/// trait MyMode {
+/// struct MyFamily;
+/// impl Family for MyFamily {
+///     type Base = dyn MyMode;
+///     type Mode = Box<dyn MyMode>;
+///     type Output = Box<dyn MyMode>;
+/// }
+/// 
+/// trait MyMode : boxed::Mode<Family = MyFamily> {
 ///     // TODO: Define some common interface for ModeA and ModeB.
 /// }
 /// 
 /// struct ModeA; // TODO: Add fields.
 /// impl MyMode for ModeA { }
 /// 
-/// impl<'a> Mode<'a> for ModeA {
-///     type Base = dyn MyMode + 'a;
-///     fn as_base(&self) -> &Self::Base { self }
-///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> {
-///         // Transition to ModeB. ModeA can swap to ModeB because both share the same Base.
-///         Some(Box::new(|previous : Self| { ModeB }))
+/// impl boxed::Mode for ModeA {
+///     type Family = MyFamily;
+///     fn swap(self : Box<Self>) -> Box<dyn MyMode> {
+///         // Transition to ModeB. ModeA can swap to ModeB because both share the same Family.
+///         Box::new(ModeB)
 ///     }
 /// }
 /// 
 /// struct ModeB; // TODO: Add fields.
 /// impl MyMode for ModeB { }
 /// 
-/// impl<'a> Mode<'a> for ModeB {
-///     type Base = dyn MyMode + 'a;
-///     fn as_base(&self) -> &Self::Base { self }
-///     fn as_base_mut(&mut self) -> &mut Self::Base { self }
-///     fn get_transition(&mut self) -> Option<TransitionBox<'a, Self>> { None } // None means don't transition.
+/// impl boxed::Mode for ModeB {
+///     type Family = MyFamily;
+///     fn swap(self : Box<Self>) -> Box<dyn MyMode> { self } // Returning self means don't transition.
 /// }
 /// ```
 /// 
-/// # The `Base` parameter
+/// # Transitioning
+/// `Mode`s can choose to transition to any other `Mode` with the same `Family` associated `type`. This is accomplished
+/// by returning a new `Mode` from the `swap()` function, which will cause the parent `Automaton` to switch to this
+/// `Mode` immediately. Since 
+/// 
+/// See [`Automaton::next()`](struct.Automaton.html#method.next) for more details.
+/// 
+/// # The `Family` parameter
 /// You will notice from the [example](#usage) above that `ModeA` and `ModeB` implement `Mode` and `MyMode` separately,
 /// but the `MyMode` trait itself does **not** extend `Mode`, i.e. is defined as `trait MyMode` as opposed to
 /// `trait MyMode : Mode<Base = MyMode>`. We want to use `MyMode` as the `Base` type for `ModeA` and `ModeB`, but
@@ -63,29 +65,91 @@ use crate::Family;
 /// and would cause a compile error. Hence, while it is possible to cast `ModeA` or `ModeB` to `MyMode` or `Mode`,
 /// casting between `MyMode` and `Mode` is not allowed.
 /// 
-/// # `as_base()` and `as_base_mut()`
-/// As mentioned above, a `Mode` reference **cannot** be cast to its `Base` type. What's more, the `Automaton` can only
-/// require that the current `Mode` implements `Mode<Base = Base>`, and **cannot** enforce that it is also convertible
-/// to `Base`. That's because `Base` is a type parameter and not a trait, and therefore **cannot** be used as a
-/// constraint in `where` clauses, e.g. `where T : Base`.
+/// # Returning a value from `Mode::swap()`
+/// It is possible to output a value in addition to the `Mode` that is returned from `swap()`. In order to do this, the
+/// `Output` type of the `Family` for this `Mode` should be given a tuple containing `Family::Mode` as the first
+/// parameter and some other type as the second, which will become the return type for `Mode::swap()`. The
+/// `Automaton::next_with_output()` function will interpret the first parameter as the new `Mode` to switch in, and the
+/// second parameter will be returned as a result.
 /// 
-/// Since the `Automaton` needs to be able to return a `Base` reference to the current `Mode`, each `Mode` is required
-/// to implement `as_base()` and `as_base_mut()` functions that return `self` as a `&Base` and a `&mut Base`,
-/// respectively. Unfortunately, these functions have to be defined manually for each struct that implements `Mode`.
+/// **NOTE:** If you do this, you will be required to use `Automaton::next_with_output()`, not `Automaton::next()`,
+/// due to the `trait` bounds on both functions. However, ignoring the return value is allowed, if desired.
 /// 
-/// **NOTE:** This may change when [`Unsize`](https://github.com/rust-lang/rfcs/blob/master/text/0982-dst-coercion.md)
-/// becomes stable, since it will provide a way for `struct`s to express that a generic parameter must be convertible to
-/// a particular type.
+/// # Alternative `trait Mode`s for pointer types
+/// When storing `Mode`s with a large amount of data or that should be accessed through some `dyn Trait` reference, it
+/// is desirable to have the `Automaton` operate on a **pointer** to a `Mode`, as opposed to storing the current `Mode`
+/// in place. This is possible by setting the `Family::Mode` type to a pointer type wrapping a `Family::Base`, e.g.
+/// 
+/// ```
+/// use mode::Family;
+/// # use mode::boxed::Mode;
+/// 
+/// # trait SomeTrait : Mode<Family = FamilyWithPointerMode> { }
+/// 
+/// struct FamilyWithPointerMode;
+/// impl Family for FamilyWithPointerMode {
+///     type Base = dyn SomeTrait;
+///     type Mode = Box<dyn SomeTrait>; // All Modes in this Family will be stored as a Box<dyn SomeTrait> internally.
+///     type Output = Box<dyn SomeTrait>;
+/// }
+/// ```
+/// 
+/// However, when doing so, the responsibility for swapping in the next `Mode` needs to be delegated to the
+/// type **stored** in the pointer, not the pointer itself.
+/// 
+/// Hence, this module defines a number of other `trait Mode`s that are meant to be extended **in place of**
+/// `mode::Mode` when a `std` pointer type, e.g. `Box` or `Arc`, is being used. These are all stored in separate
+/// submodules that rougly correspond to the path of the pointer type under `std`, e.g. `mode::boxed::Mode` wraps a
+/// `std::boxed::Box`, and `mode::sync::Mode` wraps a `std::sync::Arc`. These define a slightly different `swap()`
+/// function that accepts the **pointer** type as `self`, e.g. `self : Box<Self>`. There are multiple advantages to
+/// this, but the main one is that the `Mode` implementation can return its own pointer from the `swap()` function when
+/// it wants to remain active, instead of returning a new pointer wrapping itself. Moving a pointer into and out of the
+/// `swap()` function can be **much** cheaper than moving the object itself around, especially for `Mode`s that store
+/// large amounts of data.
+/// 
+/// When writing an `impl` for a `struct` in a `Family` that stores a pointer type, the corresponding `Mode`
+/// implementation (e.g. `mode::boxed::Mode`) should be used **instead of** `mode::Mode` itself. The crate provides auto
+/// `impl mode::Mode`s for each of these, allowing them to be used in the `Automaton`. (See example below.)
+/// 
+/// ```
+/// use mode::{sync, Family};
+/// use std::sync::Arc;
+/// 
+/// trait SomeTrait : sync::Mode<Family = FamilyWithArcMode> { }
+/// 
+/// struct FamilyWithArcMode;
+/// impl Family for FamilyWithArcMode {
+///     type Base = dyn SomeTrait;
+///     type Mode = Arc<dyn SomeTrait>; // All Modes in this Family will be stored as an Arc<dyn SomeTrait> internally.
+///     type Output = Arc<dyn SomeTrait>;
+/// }
+/// 
+/// struct SomeMode;
+/// impl SomeTrait for SomeMode { } // TODO
+/// 
+/// // Note that we ONLY impl sync::Mode for SomeMode. There is an auto-impl of mode::Mode for Arc<T : sync::Mode>, so
+/// // we don't need to implement mode::Mode ourselves.
+/// //
+/// impl sync::Mode for SomeMode {
+///     type Family = FamilyWithArcMode;
+///     fn swap(self : Arc<Self>) -> Arc<dyn SomeTrait> {
+///         // TODO: Insert logic here to switch states by returning a different Arc.
+///         self
+///     }
+/// }
+/// ```
 /// 
 pub trait Mode {
     type Family : Family + ?Sized;
 
-    /// Every time `perform_transitions()` is called on an `Automaton`, This function will be called on the current
-    /// `Mode` to determine whether it wants another `Mode` to become active. If this function returns `None`, the
-    /// current `Mode` will remain active. If it returns a valid `Transition` function, however, the `Automaton` will
-    /// call the function on the active `Mode`, consuming it and swapping in whichever `Mode` is produced as a result.
+    /// Every time `next()` or `next_with_output()` is called on an `Automaton`, This function will be called on the
+    /// current `Mode` to determine whether it wants another `Mode` to become active. If this function returns `self`,
+    /// the current `Mode` will remain active. However, if it returns another object implementing `Mode` with the same
+    /// `Family` type, the `Automaton` will make the `Mode` that was returned active immediately after the `swap()`
+    /// function returns, consuming the `Mode` that was previously active. Since the original `Mode` is consumed, it is
+    /// possible for the current `Mode` to move state out of itself and into the new `Mode` being created.
     /// 
-    /// See [`Transition`](trait.Transition.html) for more details.
+    /// See [`Automaton::next()`](struct.Automaton.html#method.next) for more details.
     /// 
     fn swap(self) -> <Self::Family as Family>::Output;
 }
