@@ -113,8 +113,7 @@ impl boxed::Mode for Sleeping {
 }
 
 fn main() {
-    let mode : Box<dyn Activity> = Box::new(Working { hours_worked: 0 });
-    let mut person : Automaton<ActivityFamily> = Automaton::with_mode(mode);
+    let mut person = Automaton::<ActivityFamily>::with_mode(Box::new(Working { hours_worked: 0 }));
     
     for _age in 18..100 {
         // Update the current Mode for the Automaton.
