@@ -140,6 +140,15 @@ use crate::Family;
 /// ```
 /// 
 pub trait Mode {
+    /// The `Family` type to which this `Mode` implementation belongs. `Mode` implementations are **only** allowed
+    /// to return another `Mode`s from the `swap()` method if it has the exact same `Family` type as itself.
+    /// Swapping between `Mode`s with different `Family` types is **not** allowed, even if the associated `type`s in
+    /// two separate `Family` implementations are identical to each other. This is because reusing the same
+    /// `Base` interface or `Mode` type between `Mode` implementations does not *necessarily* imply that both states
+    /// are meant to represent states in the same state machine.
+    /// 
+    /// See [`Family`](trait.Family.html) for more details.
+    /// 
     type Family : Family + ?Sized;
 
     /// Every time `next()` or `next_with_output()` is called on an `Automaton`, This function will be called on the
@@ -149,17 +158,41 @@ pub trait Mode {
     /// function returns, consuming the `Mode` that was previously active. Since the original `Mode` is consumed, it is
     /// possible for the current `Mode` to move state out of itself and into the new `Mode` being created.
     /// 
-    /// See [`Automaton::next()`](struct.Automaton.html#method.next) for more details.
+    /// This function returns `Self::Family::Output`, which can either be the `Self::Family::Mode` type or some
+    /// `(Self::Family::Mode, T)` tuple, where `Self::Family::Mode` represents the new `Mode` to switch in as active and
+    /// `T` represents some value that should be returned from `Automaton::next_with_output()`. Regardless of the
+    /// `Self::Family::Output` type, the `Mode` **must** return a `Self::Family::Mode` type to transition in. If `self`
+    /// is returned from this function, the current `Mode` will remain active and the
+    /// 
+    /// See [`Automaton::next()`](struct.Automaton.html#method.next) and
+    /// [`Automaton::next()`](struct.Automaton.html#method.next_with_output) for more details.
     /// 
     fn swap(self) -> <Self::Family as Family>::Output;
 }
 
+/// Defines types that can be used to set up an `Automaton` that stores a `Box<Mode>` instead of a `Mode` in place.
+/// 
 pub mod boxed {
     use crate::Family;
 
+    /// Alternate `trait Mode` that takes a `Box<Mode>` as the `self` parameter instead of `Mode`.
+    /// 
+    /// For more on how to use this `trait`, see `mode::Mode`.
+    /// 
     pub trait Mode {
+        /// The `Family` type to which this `Mode` implementation belongs. In order to use the `boxed::Mode` trait, this
+        /// `Family` should be a `Box<T>` where `T : boxed::Mode`.
+        /// 
+        /// See `mode::Mode` for more details.
+        /// 
         type Family : Family + ?Sized;
 
+        /// Will be called on the current `Mode` by `Automaton::next()` or `Automaton::next_with_output()` in order to
+        /// determine whether it wants the `Automaton` to transition to another `Mode`. Note that this `trait`'s
+        /// `swap()` function takes a `Box<Self>` instead of just `self`.
+        /// 
+        /// See `mode::Mode` for more details.
+        /// 
         fn swap(self : Box<Self>) -> <Self::Family as Family>::Output;
     }
 
@@ -176,13 +209,30 @@ pub mod boxed {
     }
 }
 
+/// Defines types that can be used to set up an `Automaton` that stores an `Rc<Mode>` instead of a `Mode` in place.
+/// 
 pub mod rc {
     use crate::Family;
     use std::rc::Rc;
 
+    /// Alternate `trait Mode` that takes an `Rc<Mode>` as the `self` parameter instead of `Mode`.
+    /// 
+    /// For more on how to use this `trait`, see `mode::Mode`.
+    /// 
     pub trait Mode {
+        /// The `Family` type to which this `Mode` implementation belongs. In order to use the `rc::Mode` trait, this
+        /// `Family` should be an `Rc<T>` where `T : rc::Mode`.
+        /// 
+        /// See `mode::Mode` for more details.
+        /// 
         type Family : Family + ?Sized;
 
+        /// Will be called on the current `Mode` by `Automaton::next()` or `Automaton::next_with_output()` in order to
+        /// determine whether it wants the `Automaton` to transition to another `Mode`. Note that this `trait`'s
+        /// `swap()` function takes an `Rc<Self>` instead of just `self`.
+        /// 
+        /// See `mode::Mode` for more details.
+        /// 
         fn swap(self : Rc<Self>) -> <Self::Family as Family>::Output;
     }
 
@@ -199,13 +249,30 @@ pub mod rc {
     }
 }
 
+/// Defines types that can be used to set up an `Automaton` that stores an `Arc<Mode>` instead of a `Mode` in place.
+/// 
 pub mod sync {
     use crate::Family;
     use std::sync::Arc;
 
+    /// Alternate `trait Mode` that takes an `Arc<Mode>` as the `self` parameter instead of `Mode`.
+    /// 
+    /// For more on how to use this `trait`, see `mode::Mode`.
+    /// 
     pub trait Mode {
+        /// The `Family` type to which this `Mode` implementation belongs. In order to use the `sync::Mode` trait, this
+        /// `Family` should be an `Arc<T>` where `T : sync::Mode`.
+        /// 
+        /// See `mode::Mode` for more details.
+        /// 
         type Family : Family + ?Sized;
 
+        /// Will be called on the current `Mode` by `Automaton::next()` or `Automaton::next_with_output()` in order to
+        /// determine whether it wants the `Automaton` to transition to another `Mode`. Note that this `trait`'s
+        /// `swap()` function takes an `Arc<Self>` instead of just `self`.
+        /// 
+        /// See `mode::Mode` for more details.
+        /// 
         fn swap(self : Arc<Self>) -> <Self::Family as Family>::Output;
     }
 
