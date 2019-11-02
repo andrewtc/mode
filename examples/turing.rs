@@ -10,6 +10,7 @@ use std::marker::PhantomData;
 const HEAD : u16 = 8;
 const MASK : u16 = 1 << HEAD;
 
+// NOTE: The PhantomData here is only necessary to prove that we're using 'a. Otherwise, this could be a unit struct.
 struct StateFamily<'a> { __ : PhantomData<&'a ()> }
 impl<'a> Family for StateFamily<'a> {
     type Base = State<'a>;
