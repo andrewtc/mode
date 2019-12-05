@@ -4,6 +4,9 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
+// NOTE: This example is the same as the "Activity" example (examples/activity.rs), except that it uses a concrete type
+// (an enum) to represent all states of the Automaton, as opposed to using a separate struct for each state.
+
 use mode::{Automaton, Family, Mode};
 
 struct ActivityFamily;
@@ -77,7 +80,7 @@ impl Mode for Activity {
 }
 
 fn main() {
-    let mut person = Automaton::<ActivityFamily>::with_mode(Activity::Working { hours_worked: 0 });
+    let mut person = ActivityFamily::automaton_with_mode(Activity::Working { hours_worked: 0 });
     
     for _age in 18..100 {
         person.update();

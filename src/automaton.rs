@@ -49,6 +49,7 @@ use std::ops::{Deref, DerefMut};
 /// # }
 /// 
 /// // Use with_mode() to create the Automaton with an initial state.
+/// // NOTE: We could alternatively use SomeFamily::automaton_with_mode() here to shorten this.
 /// let mut automaton = Automaton::<SomeFamily>::with_mode(Box::new(SomeMode));
 /// 
 /// // Functions can be called on the inner Mode through an Automaton reference via the Deref and DerefMut traits
@@ -166,6 +167,39 @@ impl<F> Automaton<F>
 {
     /// Creates a new `Automaton` with the specified `mode`, which will be the initial active `Mode` for the `Automaton`
     /// that is returned.
+    /// 
+    /// **NOTE:** If `F::Base` is a type that implements `Default`, [`new()`](struct.Automaton.html#method.new) can be
+    /// used instead.
+    /// 
+    /// Since the `F` parameter cannot be determined automatically, using this function usually requires the use of the
+    /// turbofish, e.g. `Automaton::<SomeFamily>::with_mode()`. To avoid that, `Family` provides an
+    /// `automaton_with_mode()` associated function that can be used instead. See
+    /// [`Family::automaton_with_mode()`](trait.Family.html#method.automaton_with_mode) for more details.
+    /// 
+    /// # Usage
+    /// ```
+    /// use mode::*;
+    /// 
+    /// struct SomeFamily;
+    /// impl Family for SomeFamily {
+    ///     type Base = SomeMode;
+    ///     type Mode = SomeMode;
+    ///     type Output = SomeMode;
+    /// }
+    /// 
+    /// enum SomeMode { A, B, C };
+    /// impl Mode for SomeMode {
+    ///     type Family = SomeFamily;
+    ///     fn swap(mut self) -> Self {
+    ///         // TODO: Logic for transitioning between states goes here.
+    ///         self
+    ///     }
+    /// }
+    /// 
+    /// // Create an Automaton with A as the initial Mode.
+    /// // NOTE: We could alternatively use SomeFamily::automaton_with_mode() here to shorten this.
+    /// let mut automaton = Automaton::<SomeFamily>::with_mode(SomeMode::A);
+    /// ```
     /// 
     pub fn with_mode(mode : F::Mode) -> Self {
         Self {
@@ -314,11 +348,16 @@ impl<F> Automaton<F>
 {
     /// Creates a new `Automaton` with a default `Mode` instance as the active `Mode`.
     /// 
-    /// **NOTE:** This only applies if `Base` is a **concrete** type (e.g. `Automaton<SomeStructThatImplsMode>`) that
-    /// implements `Default`. If `Base` is a **trait** type (e.g. `Automaton<dyn SomeTraitThatExtendsMode>`) or you
-    /// would otherwise like to specify the initial mode of the created `Automaton`, use
-    /// [`with_initial_mode()`](struct.Automaton.html#method.with_initial_mode) instead.
+    /// **NOTE:** This only applies if `F::Base` is a **concrete** type that implements `Default`. If `F::Base` is a
+    /// **trait** type, or you need to specify the initial mode of the created `Automaton`, use
+    /// [`with_mode()`](struct.Automaton.html#method.with_mode) instead.
     /// 
+    /// Since the `F` parameter cannot be determined automatically, using this function usually requires the use of the
+    /// turbofish, e.g. `Automaton::<SomeFamily>::new()`. To avoid that, `Family` provides an `automaton()` associated
+    /// function that can be used instead. See [`Family::automaton()`](trait.Family.html#method.automaton) for more
+    /// details.
+    /// 
+    /// # Usage
     /// ```
     /// use mode::*;
     /// # 
@@ -347,8 +386,10 @@ impl<F> Automaton<F>
     /// }
     /// 
     /// // Create an Automaton with a default Mode.
-    /// // NOTE: Deref coercion allows us to access the CounterMode's count variable through an Automaton reference.
+    /// // NOTE: We could alternatively use SomeFamily::automaton() here to shorten this.
     /// let mut automaton = Automaton::<SomeFamily>::new();
+    /// 
+    /// // NOTE: Deref coercion allows us to access the CounterMode's count variable through an Automaton reference.
     /// assert!(automaton.count == 0);
     /// 
     /// // Keep transitioning the current Mode out until we reach the target state
@@ -408,7 +449,7 @@ impl<F> Default for Automaton<F>
 ///     fn swap(self : Box<Self>) -> Box<dyn MyBase> { self } // TODO
 /// }
 /// 
-/// let automaton = Automaton::<MyFamily>::with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));
+/// let automaton = MyFamily::automaton_with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));
 /// dbg!(automaton);
 /// ```
 /// 
@@ -459,7 +500,7 @@ impl<F> fmt::Debug for Automaton<F>
 ///     fn swap(self : Box<Self>) -> Box<dyn MyBase> { self } // TODO
 /// }
 /// 
-/// let automaton = Automaton::<MyFamily>::with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));
+/// let automaton = MyFamily::automaton_with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));
 /// println!("{}", automaton);
 /// ```
 /// 

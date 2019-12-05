@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::Mode;
+use crate::{Automaton, Mode};
 
 /// A meta-`trait` defining the common `Base` type and `Mode::swap()` return type used by a related group of `Mode`
 /// implementations. `Mode`s can **only** transition to other `Mode`s within the same `Family`, i.e. where both `Mode`s
@@ -94,4 +94,87 @@ pub trait Family {
     /// swapped in, or a `Result<(), SomeError>` indicating whether or not an error occurred while transitioning.
     /// 
     type Output;
+
+    /// Convenience function allowing an `Automaton` to be created for this `Family` type. Note that this is shorthand
+    /// for `Automaton::new()`, and therefore `Self::Mode` *must* implement `Default`. See
+    /// [`Automaton::new()`](struct.Automaton.html#method.new) for more details.
+    /// 
+    /// # Usage
+    /// ```
+    /// use mode::*;
+    /// # 
+    /// # struct SomeFamily;
+    /// # impl Family for SomeFamily {
+    /// #     type Base = ModeWithDefault;
+    /// #     type Mode = ModeWithDefault;
+    /// #     type Output = ModeWithDefault;
+    /// # }
+    /// 
+    /// struct ModeWithDefault { count : u32 };
+    /// 
+    /// impl Mode for ModeWithDefault {
+    ///     type Family = SomeFamily;
+    ///     fn swap(mut self) -> ModeWithDefault {
+    ///         // TODO: Logic for transitioning between states goes here.
+    ///         self.count += 1;
+    ///         self
+    ///     }
+    /// }
+    /// 
+    /// impl Default for ModeWithDefault {
+    ///     fn default() -> Self {
+    ///         ModeWithDefault { count: 0 }
+    ///     }
+    /// }
+    /// 
+    /// // Create an Automaton with a default Mode.
+    /// let mut automaton = SomeFamily::automaton();
+    /// 
+    /// // NOTE: Deref coercion allows us to access the CounterMode's count variable through an Automaton reference.
+    /// assert!(automaton.count == 0);
+    /// 
+    /// // Keep transitioning the current Mode out until we reach the target state
+    /// // (i.e. a count of 10).
+    /// while automaton.count < 10 {
+    ///     Automaton::next(&mut automaton);
+    /// }
+    /// ```
+    /// 
+    fn automaton() -> Automaton<Self>
+        where Self::Mode : Default
+    {
+        Automaton::new()
+    }
+
+    /// Convenience function that returns a new `Automaton` for this `Family` type with the specified `mode` as current.
+    /// Note that this is shorthand for `Automaton::with_mode()`. See
+    /// [`Automaton::with_mode()`](struct.Automaton.html#method.with_mode) for more details.
+    /// 
+    /// # Usage
+    /// ```
+    /// use mode::*;
+    /// 
+    /// struct SomeFamily;
+    /// impl Family for SomeFamily {
+    ///     type Base = SomeMode;
+    ///     type Mode = SomeMode;
+    ///     type Output = SomeMode;
+    /// }
+    /// 
+    /// enum SomeMode { A, B, C };
+    /// impl Mode for SomeMode {
+    ///     type Family = SomeFamily;
+    ///     fn swap(mut self) -> Self {
+    ///         // TODO: Logic for transitioning between states goes here.
+    ///         self
+    ///     }
+    /// }
+    /// 
+    /// // Create an Automaton with A as the initial Mode.
+    /// let mut automaton = SomeFamily::automaton_with_mode(SomeMode::A);
+    /// ```
+    /// 
+    fn automaton_with_mode(mode : Self::Mode) -> Automaton<Self> {
+        Automaton::with_mode(mode)
+    }
 }

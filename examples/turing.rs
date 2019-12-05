@@ -93,7 +93,7 @@ impl<'a> Mode for State<'a> {
 fn main() {
     let mut tape : u16 = 0b111 << HEAD;
     let mut automaton =
-        Automaton::<StateFamily>::with_mode(
+        StateFamily::automaton_with_mode(
             State{
                 name: Name::A,
                 tape: &mut tape,
