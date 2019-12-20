@@ -23,6 +23,7 @@ use crate::Family;
 /// impl Family for MyFamily {
 ///     type Base = dyn MyMode;
 ///     type Mode = Box<dyn MyMode>;
+///     type Input = ();
 ///     type Output = Box<dyn MyMode>;
 /// }
 /// 
@@ -35,7 +36,7 @@ use crate::Family;
 /// 
 /// impl boxed::Mode for ModeA {
 ///     type Family = MyFamily;
-///     fn swap(self : Box<Self>) -> Box<dyn MyMode> {
+///     fn swap(self : Box<Self>, _input : ()) -> Box<dyn MyMode> {
 ///         // Transition to ModeB. ModeA can swap to ModeB because both share the same Family.
 ///         Box::new(ModeB)
 ///     }
@@ -46,7 +47,7 @@ use crate::Family;
 /// 
 /// impl boxed::Mode for ModeB {
 ///     type Family = MyFamily;
-///     fn swap(self : Box<Self>) -> Box<dyn MyMode> { self } // Returning self means don't transition.
+///     fn swap(self : Box<Self>, _input : ()) -> Box<dyn MyMode> { self } // Returning self means don't transition.
 /// }
 /// ```
 /// 
@@ -72,8 +73,19 @@ use crate::Family;
 /// `Automaton::next_with_output()` function will interpret the first parameter as the new `Mode` to switch in, and the
 /// second parameter will be returned as a result.
 /// 
-/// **NOTE:** If you do this, you will be required to use `Automaton::next_with_output()`, not `Automaton::next()`,
-/// due to the `trait` bounds on both functions. However, ignoring the return value is allowed, if desired.
+/// **NOTE:** If you do this, you will be required to use `Automaton::next_with_output()` or
+/// `Automaton::next_with_input_and_output()`, instead of `Automaton::next()` or `Automaton::next_with_input()`, due to
+/// the `impl` bounds on these functions.
+/// 
+/// # Passing context into `Mode::swap()`
+/// The `Mode::swap()` function takes a single `input` parameter that can be used in situations where some context is
+/// necessary in order to allow the current `Mode` to swap itself. This parameter is of type `Family::Input`, and is
+/// passed into the `swap()` function by value. If no context is necessary to switch `Mode`s, the value can effectively
+/// be ignored by setting `Family::Input` to the empty tuple type, `()`.
+/// 
+/// **NOTE:** When a non-empty `Family::Input` type is used, you will be required to use `Automaton::next_with_input()`
+/// or `Automaton::next_with_input_and_output()`, instead of `Automaton::next()` or `Automaton::next_with_output()`, due
+/// to the `impl` bounds on these functions.
 /// 
 /// # Alternative `trait Mode`s for pointer types
 /// When storing `Mode`s with a large amount of data or that should be accessed through some `dyn Trait` reference, it
@@ -83,13 +95,14 @@ use crate::Family;
 /// ```
 /// use mode::Family;
 /// # use mode::boxed::Mode;
-/// 
+/// #
 /// # trait SomeTrait : Mode<Family = FamilyWithPointerMode> { }
 /// 
 /// struct FamilyWithPointerMode;
 /// impl Family for FamilyWithPointerMode {
 ///     type Base = dyn SomeTrait;
 ///     type Mode = Box<dyn SomeTrait>; // All Modes in this Family will be stored as a Box<dyn SomeTrait> internally.
+///     type Input = ();
 ///     type Output = Box<dyn SomeTrait>;
 /// }
 /// ```
@@ -121,6 +134,7 @@ use crate::Family;
 /// impl Family for FamilyWithArcMode {
 ///     type Base = dyn SomeTrait;
 ///     type Mode = Arc<dyn SomeTrait>; // All Modes in this Family will be stored as an Arc<dyn SomeTrait> internally.
+///     type Input = ();
 ///     type Output = Arc<dyn SomeTrait>;
 /// }
 /// 
@@ -132,7 +146,7 @@ use crate::Family;
 /// //
 /// impl sync::Mode for SomeMode {
 ///     type Family = FamilyWithArcMode;
-///     fn swap(self : Arc<Self>) -> Arc<dyn SomeTrait> {
+///     fn swap(self : Arc<Self>, _input : ()) -> Arc<dyn SomeTrait> {
 ///         // TODO: Insert logic here to switch states by returning a different Arc.
 ///         self
 ///     }
@@ -151,7 +165,7 @@ pub trait Mode {
     /// 
     type Family : Family + ?Sized;
 
-    /// Every time `next()` or `next_with_output()` is called on an `Automaton`, This function will be called on the
+    /// Every time one of the `Automaton::next*()` functions is called, the `Automaton` will call this function on the
     /// current `Mode` to determine whether it wants another `Mode` to become active. If this function returns `self`,
     /// the current `Mode` will remain active. However, if it returns another object implementing `Mode` with the same
     /// `Family` type, the `Automaton` will make the `Mode` that was returned active immediately after the `swap()`
@@ -159,15 +173,15 @@ pub trait Mode {
     /// possible for the current `Mode` to move state out of itself and into the new `Mode` being created.
     /// 
     /// This function returns `Self::Family::Output`, which can either be the `Self::Family::Mode` type or some
-    /// `(Self::Family::Mode, T)` tuple, where `Self::Family::Mode` represents the new `Mode` to switch in as active and
-    /// `T` represents some value that should be returned from `Automaton::next_with_output()`. Regardless of the
-    /// `Self::Family::Output` type, the `Mode` **must** return a `Self::Family::Mode` type to transition in. If `self`
-    /// is returned from this function, the current `Mode` will remain active and the
+    /// `(mode, result)` tuple, where `mode` represents the new `Self::Family::Mode` to switch in as active and
+    /// `result` represents some value that should be returned to the caller. Regardless of the `Self::Family::Output`
+    /// type, the `Mode` **must** return a `Self::Family::Mode` type to transition in. If `self` is returned from this
+    /// function, the current `Mode` will remain active.
     /// 
     /// See [`Automaton::next()`](struct.Automaton.html#method.next) and
-    /// [`Automaton::next()`](struct.Automaton.html#method.next_with_output) for more details.
+    /// [`Automaton::next_with_output()`](struct.Automaton.html#method.next_with_output) for more details.
     /// 
-    fn swap(self) -> <Self::Family as Family>::Output;
+    fn swap(self, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output;
 }
 
 /// Defines types that can be used to set up an `Automaton` that stores a `Box<Mode>` instead of a `Mode` in place.
@@ -193,7 +207,7 @@ pub mod boxed {
         /// 
         /// See `mode::Mode` for more details.
         /// 
-        fn swap(self : Box<Self>) -> <Self::Family as Family>::Output;
+        fn swap(self : Box<Self>, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output;
     }
 
     impl<T, F> crate::Mode for Box<T>
@@ -203,8 +217,8 @@ pub mod boxed {
     {
         type Family = F;
 
-        fn swap(self) -> <Self::Family as Family>::Output {
-            self.swap()
+        fn swap(self, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output {
+            self.swap(input)
         }
     }
 }
@@ -233,7 +247,7 @@ pub mod rc {
         /// 
         /// See `mode::Mode` for more details.
         /// 
-        fn swap(self : Rc<Self>) -> <Self::Family as Family>::Output;
+        fn swap(self : Rc<Self>, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output;
     }
 
     impl<T, F> crate::Mode for Rc<T>
@@ -243,8 +257,8 @@ pub mod rc {
     {
         type Family = F;
 
-        fn swap(self) -> <Self::Family as Family>::Output {
-            self.swap()
+        fn swap(self, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output {
+            self.swap(input)
         }
     }
 }
@@ -273,7 +287,7 @@ pub mod sync {
         /// 
         /// See `mode::Mode` for more details.
         /// 
-        fn swap(self : Arc<Self>) -> <Self::Family as Family>::Output;
+        fn swap(self : Arc<Self>, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output;
     }
 
     impl<T, F> crate::Mode for Arc<T>
@@ -283,8 +297,8 @@ pub mod sync {
     {
         type Family = F;
 
-        fn swap(self) -> <Self::Family as Family>::Output {
-            self.swap()
+        fn swap(self, input : <Self::Family as Family>::Input) -> <Self::Family as Family>::Output {
+            self.swap(input)
         }
     }
 }

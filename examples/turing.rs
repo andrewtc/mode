@@ -5,21 +5,20 @@
 // modified, or distributed except according to those terms.
 
 use mode::{Automaton, Family, Mode};
-use std::marker::PhantomData;
 
 const HEAD : u16 = 8;
 const MASK : u16 = 1 << HEAD;
 
-// NOTE: The PhantomData here is only necessary to prove that we're using 'a. Otherwise, this could be a unit struct.
-struct StateFamily<'a> { __ : PhantomData<&'a ()> }
-impl<'a> Family for StateFamily<'a> {
-    type Base = State<'a>;
-    type Mode = State<'a>;
-    type Output = (State<'a>, bool);
+struct StateFamily;
+impl Family for StateFamily {
+    type Base = State;
+    type Mode = State;
+    type Input = u16;
+    type Output = (State, u16);
 }
 
-#[derive(Copy, Clone, Debug)]
-enum Name { A, B, C, D, E, H }
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum State { A, B, C, D, E, H }
 
 #[derive(Copy, Clone, Debug)]
 enum PrintOp { Clear, Print }
@@ -27,23 +26,17 @@ enum PrintOp { Clear, Print }
 #[derive(Copy, Clone, Debug)]
 enum ShiftOp { Left,  Right }
 
-#[derive(Debug)]
-struct State<'a> {
-    name : Name,
-    tape : &'a mut u16,
-}
-
-impl<'a> Mode for State<'a> {
-    type Family = StateFamily<'a>;
-    fn swap(mut self) -> (Self, bool) {
-        use Name::*;
+impl<'a> Mode for State {
+    type Family = StateFamily;
+    fn swap(self, mut tape : u16) -> (Self, u16) {
+        use State::*;
         use PrintOp::*;
         use ShiftOp::*;
 
-        let bit = (*self.tape & MASK) >> HEAD;
+        let bit = (tape & MASK) >> HEAD;
 
         let (next, op) =
-            match (self.name, bit) {
+            match (self, bit) {
                 (A, 0) => (H, None),
                 (A, 1) => (B, Some((Clear, Right))),
                 (B, 0) => (C, Some((Clear, Right))),
@@ -58,11 +51,7 @@ impl<'a> Mode for State<'a> {
                 (_, _) => unreachable!(),
             };
 
-        print!(
-            "{:016b} {:?} => {:?}, ",
-            self.tape,
-            self.name,
-            next);
+        print!("{:016b} {:?} => {:?}, ", tape, self, next);
 
         if let Some(op) = op {
             println!("{:?}, {:?}", op.0, op.1);
@@ -71,33 +60,27 @@ impl<'a> Mode for State<'a> {
             println!("Halt");
         }
 
-        let halt = op.is_none();
-
         if let Some((print_op, shift_op)) = op {
             match print_op {
-                Print => { *self.tape = *self.tape |  (1 << HEAD); },
-                Clear => { *self.tape = *self.tape & !(1 << HEAD); },
+                Print => { tape = tape |  (1 << HEAD) },
+                Clear => { tape = tape & !(1 << HEAD) },
             }
 
             match shift_op {
-                Left  => { *self.tape = *self.tape << 1; },
-                Right => { *self.tape = *self.tape >> 1; },
+                Left  => { tape = tape << 1 },
+                Right => { tape = tape >> 1 },
             }
         }
 
-        self.name = next;
-        (self, !halt)
+        (next, tape)
     }
 }
 
 fn main() {
     let mut tape : u16 = 0b111 << HEAD;
-    let mut automaton =
-        StateFamily::automaton_with_mode(
-            State{
-                name: Name::A,
-                tape: &mut tape,
-            });
+    let mut automaton = StateFamily::automaton_with_mode(State::A);
 
-    while Automaton::next_with_output(&mut automaton) { }
+    while *automaton != State::H {
+        tape = Automaton::next_with_input_and_output(&mut automaton, tape);
+    }
 }

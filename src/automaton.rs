@@ -15,9 +15,9 @@ use std::ops::{Deref, DerefMut};
 /// Represents a state machine over a set of `Mode`s within the same `Family`.
 /// 
 /// The `Automaton` contains a single, active `Mode` that represents the current state of the state machine. The current
-/// `Mode` is accessible via `borrow_base()` and `borrow_base_mut()` functions, which return a `Base` reference, or via
-/// `Deref` coercion. The `Automaton` provides a `next()` function that should be called regularly in order to allow the
-/// current state to swap in another `Mode` as active, if desired.
+/// `Mode` is accessible via `borrow_mode()` and `borrow_mode_mut()` functions, which return an `F::Base` reference, or
+/// via `Deref` coercion. The `Automaton` provides a `next()` function that should be called regularly in order to allow
+/// the current state to swap in another `Mode` as active, if desired.
 /// 
 /// See [`Mode::swap()`](trait.Mode.html#tymethod.swap) for more details.
 /// 
@@ -29,6 +29,7 @@ use std::ops::{Deref, DerefMut};
 /// # impl Family for SomeFamily {
 /// #     type Base = dyn MyBase;
 /// #     type Mode = Box<dyn MyBase>;
+/// #     type Input = ();
 /// #     type Output = Box<dyn MyBase>;
 /// # }
 /// #
@@ -45,7 +46,7 @@ use std::ops::{Deref, DerefMut};
 /// # 
 /// # impl boxed::Mode for SomeMode {
 /// #     type Family = SomeFamily;
-/// #     fn swap(self : Box<Self>) -> Box<dyn MyBase> { self }
+/// #     fn swap(self : Box<Self>, _input : ()) -> Box<dyn MyBase> { self }
 /// # }
 /// 
 /// // Use with_mode() to create the Automaton with an initial state.
@@ -67,27 +68,26 @@ use std::ops::{Deref, DerefMut};
 /// # The `F` parameter
 /// 
 /// One important thing to note about the `F` generic parameter it that it is **not** the base `Mode` type that will be
-/// stored in the `Automaton`, itself. Rather, it is a separate `struct` that represents the group of all `Mode` types
-/// that are compatible with the `Automaton`. For example, an `Automaton<SomeFamily>` will **only** be able to operate
-/// on types that implement `Mode<Family = SomeFamily>`.
+/// stored in the `Automaton`, itself. Rather, it is a separate, user-defined `struct` that implements the `Family`
+/// trait, representing the group of all `Mode` types that are compatible with the `Automaton`. For example, an
+/// `Automaton<SomeFamily>` will **only** be able to switch between states that implement `Mode<Family = SomeFamily>`.
 /// 
 /// # `F::Mode`, `F::Base`, and pointer types
 /// 
 /// Another important thing to understand is that the actual type stored in the `Automaton` will be `F::Mode`, **not**
-/// `F::Base`. This has to be the case because if `F::Base` is an unsized type, e.g. a `dyn Trait`, then `F::Mode` is
-/// **required** be a `Sized` pointer type, e.g. a `Box` or an `Rc`. When this is the case, the `Automaton` will
-/// actually call `Mode::swap()` on the **pointer** type wrapping the stored type. There are several blanket `impl`s
-/// for various pointer types defined in the `mode` submodule that then delegate the responsibility of switching the
-/// current `Mode` to some other interface, e.g. `impl<F> Mode for Box<boxed::Mode<Family = F>>`. Please note that
-/// `boxed::Mode` is a completely **different** `trait` than `Mode` with a `swap()` method that operates on
+/// `F::Base`. This has to be the case because, while `F::Base` can be an unsized type, e.g. a `dyn Trait`, `F::Mode` is
+/// **required** to be a `Sized` type, e.g. a `Box` or an `Rc`. Because of this, when a pointer type like `Box` is used,
+/// the `Automaton` will actually call `Mode::swap()` on the **pointer** wrapping the stored type. There are several
+/// blanket `impl`s for various pointer types defined in the `mode` submodule that then delegate the responsibility of
+/// switching the current `Mode` to some other `trait`, e.g. `impl<F> Mode for Box<boxed::Mode<Family = F>>`. Please
+/// note that `boxed::Mode` is a completely **different** `trait` than `Mode`, with a `swap()` method that operates on
 /// `self : Box<Self>` instead of just `self`.
 /// 
-/// The reason for this is that when `F::Mode` is a pointer type, the inner `Mode` may be a very large object that would
-/// be slow to move into and out of the `Mode::swap()` function. Since the convention for keeping the `Automaton` in the
-/// same state is to return `self` from `Mode::swap()`, moving the inner `Mode` out of a pointer and back into another
-/// one might result in two needless (and potentially computationally expensive) copy operations in order to move the
-/// current state into the function and then back out into the `Automaton` again, even if the current `Mode` remained
-/// current after the `swap()`. (See example below.)
+/// One advantage of having `F::Mode` be a pointer type is that the inner `Mode` can be a very large object that would
+/// otherwise be slow to move into and out of the `Mode::swap()` function by value. Since the convention for keeping the
+/// `Automaton` in the same state is to return `self` from `Mode::swap()`, moving the `Mode` into and out of the
+/// function by value would result in two needless and potentially expensive copy operations, even when switching to the
+/// same `Mode` that was current before `swap()` was called. (See example below.)
 /// 
 /// ```
 /// use mode::{Family, Mode};
@@ -96,6 +96,7 @@ use std::ops::{Deref, DerefMut};
 /// impl Family for ReallyBigFamily {
 ///     type Base = ReallyBigMode;
 ///     type Mode = ReallyBigMode;
+///     type Input = ();
 ///     type Output = ReallyBigMode;
 /// }
 /// 
@@ -111,7 +112,7 @@ use std::ops::{Deref, DerefMut};
 /// 
 /// impl Mode for ReallyBigMode {
 ///     type Family = ReallyBigFamily;
-///     fn swap(self) -> Self {
+///     fn swap(self, _input : ()) -> Self {
 ///         // This is silly, since we will never swap to another Mode in this scenario. However, even if we were fine
 ///         // never making another Mode current like this, each call to swap() would still (potentially) move 1 MiB of
 ///         // data into the function and then right back out! That's not very efficient, to say the least.
@@ -121,9 +122,9 @@ use std::ops::{Deref, DerefMut};
 /// ```
 /// 
 /// Having a separate `swap()` interface that operates on the pointer type itself, e.g.
-/// `fn swap(self : Box<Self>) -> <Self::Family as Family>::Output` in `boxed::Mode`, allows the **pointer** itself to
-/// be moved in and out of the `swap()` function, while still delegating the responsibility of swapping states to the
-/// stored type itself. (See example below.)
+/// `fn swap(self : Box<Self>, _input : ()) -> <Self::Family as Family>::Output` in `boxed::Mode`, allows the
+/// **pointer** itself to be moved in and out of the `swap()` function, while still delegating the responsibility of
+/// swapping states to the stored type itself. (See example below.)
 /// 
 /// ```
 /// use mode::{boxed, Family};
@@ -132,6 +133,7 @@ use std::ops::{Deref, DerefMut};
 /// impl Family for ReallyBigFamily {
 ///     type Base = ReallyBigMode;
 ///     type Mode = Box<ReallyBigMode>;
+///     type Input = ();
 ///     type Output = Box<ReallyBigMode>;
 /// }
 /// 
@@ -147,7 +149,7 @@ use std::ops::{Deref, DerefMut};
 /// 
 /// impl boxed::Mode for ReallyBigMode {
 ///     type Family = ReallyBigFamily;
-///     fn swap(self : Box<Self>) -> Box<Self> {
+///     fn swap(self : Box<Self>, _input : ()) -> Box<Self> {
 ///         // This moves the Box back out of the function, not the object itself, which is *much* cheaper!
 ///         self
 ///     }
@@ -184,13 +186,14 @@ impl<F> Automaton<F>
     /// impl Family for SomeFamily {
     ///     type Base = SomeMode;
     ///     type Mode = SomeMode;
+    ///     type Input = ();
     ///     type Output = SomeMode;
     /// }
     /// 
     /// enum SomeMode { A, B, C };
     /// impl Mode for SomeMode {
     ///     type Family = SomeFamily;
-    ///     fn swap(mut self) -> Self {
+    ///     fn swap(mut self, _input : ()) -> Self {
     ///         // TODO: Logic for transitioning between states goes here.
     ///         self
     ///     }
@@ -248,7 +251,7 @@ impl<F> Automaton<F>
 
 impl<F, M> Automaton<F>
     where
-        F : Family<Mode = M, Output = M> + ?Sized,
+        F : Family<Mode = M, Input = (), Output = M> + ?Sized,
         M : Mode<Family = F>,
 {
     /// Calls `swap()` on the current `Mode` to determine whether it wants to transition out, swapping in whatever
@@ -257,17 +260,31 @@ impl<F, M> Automaton<F>
     /// See [`Mode::swap()`](trait.Mode.html#tymethod.swap) for more details.
     /// 
     pub fn next(this : &mut Self) {
+        Self::next_with_input(this, ());
+    }
+}
+
+impl<F, M, Input> Automaton<F>
+    where
+        F : Family<Mode = M, Input = Input, Output = M> + ?Sized,
+        M : Mode<Family = F>,
+{
+    /// Same as `Automaton::next()`, except that it passes `input` into the `swap()` function.
+    /// 
+    /// See [`Automaton::next()`](#method.next) for more details.
+    /// 
+    pub fn next_with_input(this : &mut Self, input : Input) {
         let next =
             this.mode.take()
                 .expect("Cannot swap to next Mode because another swap is already taking place!")
-                .swap();
+                .swap(input);
         this.mode = Some(next);
     }
 }
 
 impl<F, M, Output> Automaton<F>
     where
-        F : Family<Mode = M, Output = (M, Output)> + ?Sized,
+        F : Family<Mode = M, Input = (), Output = (M, Output)> + ?Sized,
         M : Mode<Family = F>,
 {
     /// For `Mode` implementations that return a tuple with a `Mode` and some other parameter, calls `swap()` on the
@@ -278,10 +295,24 @@ impl<F, M, Output> Automaton<F>
     /// See [`Mode::swap()`](trait.Mode.html#tymethod.swap) for more details.
     /// 
     pub fn next_with_output(this : &mut Self) -> Output {
+        Self::next_with_input_and_output(this, ())
+    }
+}
+
+impl<F, M, Input, Output> Automaton<F>
+    where
+        F : Family<Mode = M, Input = Input, Output = (M, Output)> + ?Sized,
+        M : Mode<Family = F>,
+{
+    /// Same as `Automaton::next_with_output()`, except that it passes `input` into the `swap()` function.
+    /// 
+    /// See [`Automaton::next()`](#method.next_with_output) for more details.
+    /// 
+    pub fn next_with_input_and_output(this : &mut Self, input : Input) -> Output {
         let (next, result) =
             this.mode.take()
                 .expect("Cannot swap to next Mode because another swap is already taking place!")
-                .swap();
+                .swap(input);
         this.mode = Some(next);
         result
     }
@@ -365,6 +396,7 @@ impl<F> Automaton<F>
     /// # impl Family for SomeFamily {
     /// #     type Base = ModeWithDefault;
     /// #     type Mode = ModeWithDefault;
+    /// #     type Input = ();
     /// #     type Output = ModeWithDefault;
     /// # }
     /// 
@@ -372,7 +404,7 @@ impl<F> Automaton<F>
     /// 
     /// impl Mode for ModeWithDefault {
     ///     type Family = SomeFamily;
-    ///     fn swap(mut self) -> ModeWithDefault {
+    ///     fn swap(mut self, _input : ()) -> ModeWithDefault {
     ///         // TODO: Logic for transitioning between states goes here.
     ///         self.count += 1;
     ///         self
@@ -431,6 +463,7 @@ impl<F> Default for Automaton<F>
 /// impl Family for MyFamily {
 ///     type Base = dyn MyBase;
 ///     type Mode = Box<dyn MyBase>;
+///     type Input = ();
 ///     type Output = Box<dyn MyBase>;
 /// }
 /// 
@@ -446,7 +479,7 @@ impl<F> Default for Automaton<F>
 /// 
 /// impl boxed::Mode for MyMode {
 ///     type Family = MyFamily;
-///     fn swap(self : Box<Self>) -> Box<dyn MyBase> { self } // TODO
+///     fn swap(self : Box<Self>, _input : ()) -> Box<dyn MyBase> { self } // TODO
 /// }
 /// 
 /// let automaton = MyFamily::automaton_with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));
@@ -477,6 +510,7 @@ impl<F> fmt::Debug for Automaton<F>
 /// impl Family for MyFamily {
 ///     type Base = dyn MyBase;
 ///     type Mode = Box<dyn MyBase>;
+///     type Input = ();
 ///     type Output = Box<dyn MyBase>;
 /// }
 /// 
@@ -497,7 +531,7 @@ impl<F> fmt::Debug for Automaton<F>
 /// 
 /// impl boxed::Mode for MyMode {
 ///     type Family = MyFamily;
-///     fn swap(self : Box<Self>) -> Box<dyn MyBase> { self } // TODO
+///     fn swap(self : Box<Self>, _input : ()) -> Box<dyn MyBase> { self } // TODO
 /// }
 /// 
 /// let automaton = MyFamily::automaton_with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));

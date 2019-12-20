@@ -14,6 +14,7 @@ struct ActivityFamily;
 impl Family for ActivityFamily {
     type Base = Activity;
     type Mode = Activity;
+    type Input = ();
     type Output = Activity;
 }
 
@@ -46,7 +47,7 @@ impl Activity {
 impl Mode for Activity {
     type Family = ActivityFamily;
 
-    fn swap(self) -> Self {
+    fn swap(self, _input : ()) -> Self {
         match self {
             Activity::Working { hours_worked } => {
                 if hours_worked == 4 || hours_worked >= 8 {

@@ -6,7 +6,7 @@
 
 use crate::{Automaton, Mode};
 
-/// A meta-`trait` defining the common `Base` type and `Mode::swap()` return type used by a related group of `Mode`
+/// A meta-`trait` defining the common `Base` type and `Mode::swap()` conventions used by a related group of `Mode`
 /// implementations. `Mode`s can **only** transition to other `Mode`s within the same `Family`, i.e. where both `Mode`s
 /// share the same `Family` associated `type`.
 /// 
@@ -35,7 +35,7 @@ use crate::{Automaton, Mode};
 /// enum SomeMode { A, B, C }
 /// impl Mode for SomeMode {
 ///     type Family = SomeFamily;
-///     fn swap(self) -> Self {
+///     fn swap(self, _input : ()) -> Self {
 ///         match self {
 ///             Self::A => Self::B,
 ///             Self::B => Self::C,
@@ -49,6 +49,7 @@ use crate::{Automaton, Mode};
 /// impl Family for SomeFamily {
 ///     type Base = SomeMode; // All SomeFamily Modes will be visible as SomeMode from outside the Automaton.
 ///     type Mode = SomeMode; // The current Mode in the Automaton will be stored as a SomeMode in-place.
+///     type Input = (); // An empty tuple will be passed into the Mode::swap() function.
 ///     type Output = SomeMode; // All SomeFamily Modes will be able to swap in any new SomeMode.
 /// }
 /// ```
@@ -66,6 +67,7 @@ use crate::{Automaton, Mode};
 /// impl Family for SomeFamily {
 ///     type Base = dyn SomeTrait; // All SomeFamily Modes will expose their SomeTrait interface via the Automaton.
 ///     type Mode = Box<dyn SomeTrait>; // The current Mode in the Automaton will be stored as a Box<dyn SomeTrait>.
+///     type Input = (); // An empty tuple will be passed into the Mode::swap() function.
 ///     type Output = Box<dyn SomeTrait>; // All SomeFamily Modes will be able to swap in any new Box<dyn SomeTrait>.
 /// }
 /// ```
@@ -87,6 +89,13 @@ pub trait Family {
     /// 
     type Mode : Mode<Family = Self>;
 
+    /// The type of the value that will be passed into the `input` parameter of the `Mode::swap()` function when
+    /// `Automaton::next_with_input()` or `Automaton::next_with_input_and_output()` is called. This allows some context
+    /// to be passed into the `swap()` function, if desired. If no context is necessary, the empty tuple type, `()`, can
+    /// be used to have `Mode::swap()` effectively ignore the `input` parameter.
+    /// 
+    type Input;
+
     /// The type of the value that will be returned from the `Mode::swap()` function. This should usually be set to the
     /// same value as `Self::Mode`. However, this can also be a `(Self::Mode, T)` tuple, where `T` is a type that will
     /// be returned from the `Automaton::next_with_output()` function. This second tuple parameter can be used to return
@@ -107,6 +116,7 @@ pub trait Family {
     /// # impl Family for SomeFamily {
     /// #     type Base = ModeWithDefault;
     /// #     type Mode = ModeWithDefault;
+    /// #     type Input = ();
     /// #     type Output = ModeWithDefault;
     /// # }
     /// 
@@ -114,7 +124,7 @@ pub trait Family {
     /// 
     /// impl Mode for ModeWithDefault {
     ///     type Family = SomeFamily;
-    ///     fn swap(mut self) -> ModeWithDefault {
+    ///     fn swap(mut self, _input : ()) -> ModeWithDefault {
     ///         // TODO: Logic for transitioning between states goes here.
     ///         self.count += 1;
     ///         self
@@ -158,13 +168,14 @@ pub trait Family {
     /// impl Family for SomeFamily {
     ///     type Base = SomeMode;
     ///     type Mode = SomeMode;
+    ///     type Input = ();
     ///     type Output = SomeMode;
     /// }
     /// 
     /// enum SomeMode { A, B, C };
     /// impl Mode for SomeMode {
     ///     type Family = SomeFamily;
-    ///     fn swap(mut self) -> Self {
+    ///     fn swap(mut self, _input : ()) -> Self {
     ///         // TODO: Logic for transitioning between states goes here.
     ///         self
     ///     }
