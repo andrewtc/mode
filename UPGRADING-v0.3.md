@@ -11,7 +11,7 @@ between versions `0.2.4` and `0.3`, you will be able to see (roughly) the same l
 Before doing anything else, you should bump the `mode` version number in your project's `Cargo.toml`, like this:
 
 ```toml
-mode = ^0.3
+mode = "^0.3"
 ```
 
 After that, run the following command from your project's root folder to update the dependency:
