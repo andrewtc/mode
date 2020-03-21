@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::{Family, Mode};
+use crate::Family;
 use std::{
     convert::{AsRef, AsMut},
     borrow::{Borrow, BorrowMut},
@@ -19,7 +19,7 @@ use std::ops::{Deref, DerefMut};
 /// via `Deref` coercion. The `Automaton` provides a `next()` function that should be called regularly in order to allow
 /// the current state to swap in another `Mode` as active, if desired.
 /// 
-/// See [`Mode::swap()`](trait.Mode.html#tymethod.swap) for more details.
+/// See [`Automaton::next()`](#method.next) for more details.
 /// 
 /// # Usage
 /// ```
@@ -29,24 +29,24 @@ use std::ops::{Deref, DerefMut};
 /// # impl Family for SomeFamily {
 /// #     type Base = dyn MyBase;
 /// #     type Mode = Box<dyn MyBase>;
-/// #     type Input = ();
-/// #     type Output = Box<dyn MyBase>;
 /// # }
 /// #
-/// # trait MyBase : boxed::Mode<Family = SomeFamily> {
+/// # trait MyBase : Mode<Family = SomeFamily> {
 /// #     fn some_fn(&self);
 /// #     fn some_mut_fn(&mut self);
+/// #     fn some_transition_fn(self : Box<Self>) -> Box<dyn MyBase>;
 /// # }
 /// # 
 /// # struct SomeMode;
+/// # 
 /// # impl MyBase for SomeMode {
 /// #     fn some_fn(&self) { println!("some_fn was called"); }
 /// #     fn some_mut_fn(&mut self) { println!("some_mut_fn was called"); }
+/// #     fn some_transition_fn(self : Box<Self>) -> Box<dyn MyBase> { self }
 /// # }
 /// # 
-/// # impl boxed::Mode for SomeMode {
+/// # impl Mode for SomeMode {
 /// #     type Family = SomeFamily;
-/// #     fn swap(self : Box<Self>, _input : ()) -> Box<dyn MyBase> { self }
 /// # }
 /// 
 /// // Use with_mode() to create the Automaton with an initial state.
@@ -61,8 +61,9 @@ use std::ops::{Deref, DerefMut};
 /// automaton.borrow_mode().some_fn();
 /// automaton.borrow_mode_mut().some_mut_fn();
 /// 
-/// // Let the Automaton handle transitions.
-/// Automaton::next(&mut automaton);
+/// // next() can be used to transition the Automaton to a different Mode, or, as in this case, to allow the current
+/// // Mode to transition itself when ready.
+/// Automaton::next(&mut automaton, |current_mode| current_mode.some_transition_fn());
 /// ```
 /// 
 /// # The `F` parameter
@@ -76,31 +77,25 @@ use std::ops::{Deref, DerefMut};
 /// 
 /// Another important thing to understand is that the actual type stored in the `Automaton` will be `F::Mode`, **not**
 /// `F::Base`. This has to be the case because, while `F::Base` can be an unsized type, e.g. a `dyn Trait`, `F::Mode` is
-/// **required** to be a `Sized` type, e.g. a `Box` or an `Rc`. Because of this, when a pointer type like `Box` is used,
-/// the `Automaton` will actually call `Mode::swap()` on the **pointer** wrapping the stored type. There are several
-/// blanket `impl`s for various pointer types defined in the `mode` submodule that then delegate the responsibility of
-/// switching the current `Mode` to some other `trait`, e.g. `impl<F> Mode for Box<boxed::Mode<Family = F>>`. Please
-/// note that `boxed::Mode` is a completely **different** `trait` than `Mode`, with a `swap()` method that operates on
-/// `self : Box<Self>` instead of just `self`.
+/// **required** to be a `Sized` type, e.g. a `struct` or a pointer type like `Box`. Since `F::Mode` is required to
+/// implement `Mode`, there are several blanket `impl`s defined for various pointer types, e.g. `Box<T : Mode>`, so that
+/// these types can be used to store the `Mode` in the `Automaton` by pointer, as opposed to in-place.
 /// 
 /// One advantage of having `F::Mode` be a pointer type is that the inner `Mode` can be a very large object that would
-/// otherwise be slow to move into and out of the `Mode::swap()` function by value. Since the convention for keeping the
-/// `Automaton` in the same state is to return `self` from `Mode::swap()`, moving the `Mode` into and out of the
-/// function by value would result in two needless and potentially expensive copy operations, even when switching to the
-/// same `Mode` that was current before `swap()` was called. (See example below.)
+/// otherwise be slow to move into and out of `Automaton::next()` by value. Since the convention for keeping the
+/// `Automaton` in the same state is to return the same `Mode` from `Automaton::next()`, moving the `Mode` into and out
+/// of the function by value would result in needless and potentially expensive copy operations. (See example below.)
 /// 
 /// ```
-/// use mode::{Family, Mode};
+/// use mode::*;
 /// 
 /// struct ReallyBigFamily;
 /// impl Family for ReallyBigFamily {
 ///     type Base = ReallyBigMode;
 ///     type Mode = ReallyBigMode;
-///     type Input = ();
-///     type Output = ReallyBigMode;
 /// }
 /// 
-/// const DATA_SIZE : usize = 1024 * 1024; // 1 MiB
+/// const DATA_SIZE : usize = 1024; // 1 KiB
 /// 
 /// struct ReallyBigMode {
 ///     data : [u8; DATA_SIZE],
@@ -112,32 +107,30 @@ use std::ops::{Deref, DerefMut};
 /// 
 /// impl Mode for ReallyBigMode {
 ///     type Family = ReallyBigFamily;
-///     fn swap(self, _input : ()) -> Self {
-///         // This is silly, since we will never swap to another Mode in this scenario. However, even if we were fine
-///         // never making another Mode current like this, each call to swap() would still (potentially) move 1 MiB of
-///         // data into the function and then right back out! That's not very efficient, to say the least.
-///         self
-///     }
+/// }
+/// 
+/// fn main() {
+///     let mut automaton = ReallyBigFamily::automaton();
+/// 
+///     // This copies all 1 MiB of current_mode into the callback, and then right back out. Not very efficient.
+///     Automaton::next(&mut automaton, |current_mode| current_mode);
 /// }
 /// ```
 /// 
-/// Having a separate `swap()` interface that operates on the pointer type itself, e.g.
-/// `fn swap(self : Box<Self>, _input : ()) -> <Self::Family as Family>::Output` in `boxed::Mode`, allows the
-/// **pointer** itself to be moved in and out of the `swap()` function, while still delegating the responsibility of
-/// swapping states to the stored type itself. (See example below.)
+/// Having `F::Mode` be a pointer type allows the **pointer** itself to be moved in and out of the `swap()` function,
+/// while still allowing the responsibility of swapping states to be delegated to the stored type itself, if desired.
+/// (See example below.)
 /// 
 /// ```
-/// use mode::{boxed, Family};
+/// use mode::*;
 /// 
 /// struct ReallyBigFamily;
 /// impl Family for ReallyBigFamily {
 ///     type Base = ReallyBigMode;
 ///     type Mode = Box<ReallyBigMode>;
-///     type Input = ();
-///     type Output = Box<ReallyBigMode>;
 /// }
 /// 
-/// const DATA_SIZE : usize = 1024 * 1024; // 1 MiB
+/// const DATA_SIZE : usize = 1024; // 1 KiB
 /// 
 /// struct ReallyBigMode {
 ///     data : [u8; DATA_SIZE],
@@ -147,12 +140,15 @@ use std::ops::{Deref, DerefMut};
 ///     fn default() -> Self { Self { data : [0; DATA_SIZE] } }
 /// }
 /// 
-/// impl boxed::Mode for ReallyBigMode {
+/// impl Mode for ReallyBigMode {
 ///     type Family = ReallyBigFamily;
-///     fn swap(self : Box<Self>, _input : ()) -> Box<Self> {
-///         // This moves the Box back out of the function, not the object itself, which is *much* cheaper!
-///         self
-///     }
+/// }
+/// 
+/// fn main() {
+///     let mut automaton = ReallyBigFamily::automaton();
+/// 
+///     // This moves the Box back out of the function, not the ReallyBigMode object itself, which is *much* cheaper!
+///     Automaton::next(&mut automaton, |current_mode| current_mode);
 /// }
 /// ```
 /// 
@@ -186,17 +182,11 @@ impl<F> Automaton<F>
     /// impl Family for SomeFamily {
     ///     type Base = SomeMode;
     ///     type Mode = SomeMode;
-    ///     type Input = ();
-    ///     type Output = SomeMode;
     /// }
     /// 
     /// enum SomeMode { A, B, C };
     /// impl Mode for SomeMode {
     ///     type Family = SomeFamily;
-    ///     fn swap(mut self, _input : ()) -> Self {
-    ///         // TODO: Logic for transitioning between states goes here.
-    ///         self
-    ///     }
     /// }
     /// 
     /// // Create an Automaton with A as the initial Mode.
@@ -208,6 +198,99 @@ impl<F> Automaton<F>
         Self {
             mode : Some(mode),
         }
+    }
+
+    /// Calls `transition_fn` on the current `Mode` to determine whether it should transition out, swapping in whatever
+    /// `Mode` it returns as a result. Calling this function *may* change the current `Mode`, but not necessarily.
+    /// 
+    /// # Usage
+    /// ```
+    /// use mode::*;
+    /// 
+    /// struct SomeFamily;
+    /// impl Family for SomeFamily {
+    ///     type Base = State;
+    ///     type Mode = State;
+    /// }
+    /// 
+    /// #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    /// enum State { A, B, C }
+    /// impl Mode for State { type Family = SomeFamily; }
+    /// impl State {
+    ///     fn next(self) -> Self {
+    ///         match self {
+    ///             State::A => State::B,
+    ///             State::B => State::C,
+    ///             State::C => State::C, // Don't transition.
+    ///         }
+    ///     }
+    /// }
+    /// 
+    /// fn main() {
+    ///     let mut automaton = SomeFamily::automaton_with_mode(State::A);
+    ///     while *automaton != State::C {
+    ///         Automaton::next(&mut automaton, |current_mode| current_mode.next());
+    ///         println!("Now in state {:?}.", *automaton);
+    ///     }
+    /// }
+    /// ```
+    /// 
+    pub fn next<T>(automaton : &mut Self, transition_fn : T)
+        where T : FnOnce(F::Mode) -> F::Mode
+    {
+        Self::next_with_result(automaton, |mode| (transition_fn(mode), ()))
+    }
+
+    /// Calls `transition_fn` on the current `Mode` to determine whether it should transition out, swapping in whatever
+    /// `Mode` it returns as a result. Calling this function *may* change the current `Mode`, but not necessarily.
+    /// 
+    /// Unlike [`next()`](struct.Automaton.html#method.next), the `transition_fn` returns a tuple containing the new
+    /// `Mode` to transition in as well as a return value in the second parameter. The second parameter will be returned
+    /// from this function after the new `Mode` is transitioned in. This is useful for things like error handling and
+    /// allowing the calling code to sense transitions between states.
+    /// 
+    /// # Usage
+    /// ```
+    /// use mode::*;
+    /// 
+    /// struct SomeFamily;
+    /// impl Family for SomeFamily {
+    ///     type Base = State;
+    ///     type Mode = State;
+    /// }
+    /// 
+    /// #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    /// enum State { A, B, C }
+    /// impl Mode for State { type Family = SomeFamily; }
+    /// impl State {
+    ///     fn next(self) -> (Self, Self) {
+    ///         match self {
+    ///             State::A => (State::B, self),
+    ///             State::B => (State::C, self),
+    ///             State::C => (State::C, self), // Don't transition.
+    ///         }
+    ///     }
+    /// }
+    /// 
+    /// fn main() {
+    ///     let mut automaton = SomeFamily::automaton_with_mode(State::A);
+    ///     while *automaton != State::C {
+    ///         let previous = Automaton::next_with_result(&mut automaton, |current_mode| current_mode.next());
+    ///         if previous != *automaton {
+    ///             println!("Switched from state {:?} to state {:?}.", previous, *automaton);
+    ///         }
+    ///         println!("Now in state {:?}.", *automaton);
+    ///     }
+    /// }
+    /// ```
+    /// 
+    pub fn next_with_result<T, R>(automaton : &mut Self, transition_fn : T) -> R
+        where T : FnOnce(F::Mode) -> (F::Mode, R)
+    {
+        let (next_mode, result) = transition_fn(
+            automaton.mode.take().expect("Cannot swap out current Mode while another swap is taking place!"));
+        automaton.mode = Some(next_mode);
+        result
     }
 }
 
@@ -246,75 +329,6 @@ impl<F> Automaton<F>
         self.mode.as_mut()
             .expect("Cannot borrow current Mode because another swap is already taking place!")
             .borrow_mut()
-    }
-}
-
-impl<F, M> Automaton<F>
-    where
-        F : Family<Mode = M, Input = (), Output = M> + ?Sized,
-        M : Mode<Family = F>,
-{
-    /// Calls `swap()` on the current `Mode` to determine whether it wants to transition out, swapping in whatever
-    /// `Mode` it returns as a result. Calling this function *may* change the current `Mode`, but not necessarily.
-    /// 
-    /// See [`Mode::swap()`](trait.Mode.html#tymethod.swap) for more details.
-    /// 
-    pub fn next(this : &mut Self) {
-        Self::next_with_input(this, ());
-    }
-}
-
-impl<F, M, Input> Automaton<F>
-    where
-        F : Family<Mode = M, Input = Input, Output = M> + ?Sized,
-        M : Mode<Family = F>,
-{
-    /// Same as `Automaton::next()`, except that it passes `input` into the `swap()` function.
-    /// 
-    /// See [`Automaton::next()`](#method.next) for more details.
-    /// 
-    pub fn next_with_input(this : &mut Self, input : Input) {
-        let next =
-            this.mode.take()
-                .expect("Cannot swap to next Mode because another swap is already taking place!")
-                .swap(input);
-        this.mode = Some(next);
-    }
-}
-
-impl<F, M, Output> Automaton<F>
-    where
-        F : Family<Mode = M, Input = (), Output = (M, Output)> + ?Sized,
-        M : Mode<Family = F>,
-{
-    /// For `Mode` implementations that return a tuple with a `Mode` and some other parameter, calls `swap()` on the
-    /// current `Mode` to determine whether it wants to transition out. Whatever `Mode` was returned as the first tuple
-    /// parameter will be switched in as active, and the second tuple parameter will be returned from the function.
-    /// Calling this function *may* change the current `Mode`, but not necessarily.
-    /// 
-    /// See [`Mode::swap()`](trait.Mode.html#tymethod.swap) for more details.
-    /// 
-    pub fn next_with_output(this : &mut Self) -> Output {
-        Self::next_with_input_and_output(this, ())
-    }
-}
-
-impl<F, M, Input, Output> Automaton<F>
-    where
-        F : Family<Mode = M, Input = Input, Output = (M, Output)> + ?Sized,
-        M : Mode<Family = F>,
-{
-    /// Same as `Automaton::next_with_output()`, except that it passes `input` into the `swap()` function.
-    /// 
-    /// See [`Automaton::next()`](#method.next_with_output) for more details.
-    /// 
-    pub fn next_with_input_and_output(this : &mut Self, input : Input) -> Output {
-        let (next, result) =
-            this.mode.take()
-                .expect("Cannot swap to next Mode because another swap is already taking place!")
-                .swap(input);
-        this.mode = Some(next);
-        result
     }
 }
 
@@ -396,19 +410,20 @@ impl<F> Automaton<F>
     /// # impl Family for SomeFamily {
     /// #     type Base = ModeWithDefault;
     /// #     type Mode = ModeWithDefault;
-    /// #     type Input = ();
-    /// #     type Output = ModeWithDefault;
     /// # }
     /// 
     /// struct ModeWithDefault { count : u32 };
     /// 
-    /// impl Mode for ModeWithDefault {
-    ///     type Family = SomeFamily;
-    ///     fn swap(mut self, _input : ()) -> ModeWithDefault {
+    /// impl ModeWithDefault {
+    ///     fn update(mut self) -> Self {
     ///         // TODO: Logic for transitioning between states goes here.
     ///         self.count += 1;
     ///         self
     ///     }
+    /// }
+    /// 
+    /// impl Mode for ModeWithDefault {
+    ///     type Family = SomeFamily;
     /// }
     /// 
     /// impl Default for ModeWithDefault {
@@ -427,7 +442,7 @@ impl<F> Automaton<F>
     /// // Keep transitioning the current Mode out until we reach the target state
     /// // (i.e. a count of 10).
     /// while automaton.count < 10 {
-    ///     Automaton::next(&mut automaton);
+    ///     Automaton::next(&mut automaton, |current_mode| current_mode.update());
     /// }
     /// ```
     /// 
@@ -463,11 +478,9 @@ impl<F> Default for Automaton<F>
 /// impl Family for MyFamily {
 ///     type Base = dyn MyBase;
 ///     type Mode = Box<dyn MyBase>;
-///     type Input = ();
-///     type Output = Box<dyn MyBase>;
 /// }
 /// 
-/// trait MyBase : boxed::Mode<Family = MyFamily> + Debug { } // TODO: Add common interface.
+/// trait MyBase : Mode<Family = MyFamily> + Debug { } // TODO: Add common interface.
 /// 
 /// #[derive(Debug)]
 /// struct MyMode {
@@ -477,9 +490,8 @@ impl<F> Default for Automaton<F>
 /// 
 /// impl MyBase for MyMode { } // TODO: Implement common interface.
 /// 
-/// impl boxed::Mode for MyMode {
+/// impl Mode for MyMode {
 ///     type Family = MyFamily;
-///     fn swap(self : Box<Self>, _input : ()) -> Box<dyn MyBase> { self } // TODO
 /// }
 /// 
 /// let automaton = MyFamily::automaton_with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));
@@ -510,11 +522,9 @@ impl<F> fmt::Debug for Automaton<F>
 /// impl Family for MyFamily {
 ///     type Base = dyn MyBase;
 ///     type Mode = Box<dyn MyBase>;
-///     type Input = ();
-///     type Output = Box<dyn MyBase>;
 /// }
 /// 
-/// trait MyBase : boxed::Mode<Family = MyFamily> + Display { } // TODO: Add common interface.
+/// trait MyBase : Mode<Family = MyFamily> + Display { } // TODO: Add common interface.
 /// 
 /// struct MyMode {
 ///     pub foo : i32,
@@ -529,9 +539,8 @@ impl<F> fmt::Debug for Automaton<F>
 /// 
 /// impl MyBase for MyMode { } // TODO: Implement common interface.
 /// 
-/// impl boxed::Mode for MyMode {
+/// impl Mode for MyMode {
 ///     type Family = MyFamily;
-///     fn swap(self : Box<Self>, _input : ()) -> Box<dyn MyBase> { self } // TODO
 /// }
 /// 
 /// let automaton = MyFamily::automaton_with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));

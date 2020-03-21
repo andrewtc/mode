@@ -4,11 +4,12 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use mode::{Automaton, boxed, Family};
+use mode::{Automaton, Family, Mode};
 
-// This meta-struct represents a group of all Modes that can be used with the same Automaton. By implementing Family,
-// we can specify common Base and Output types for all Modes in this Family. The important thing to note is that this
-// struct will never be instantiated. It only exists to group a set of Modes together.
+// This meta-struct represents a group of all Modes that can be used with the same Automaton, i.e. all states in the
+// same state machine. By implementing Family, we can specify the common interface that will be exposed for all states
+// (type Base) and how the current state will be stored in the Automaton (type Mode). The important thing to note is
+// that this struct will never be instantiated. It only exists to group a set of states (Modes) together.
 // 
 struct ActivityFamily;
 
@@ -16,41 +17,33 @@ impl Family for ActivityFamily {
     // This is the public interface that will be exposed by the Automaton for all Modes in this Family.
     type Base = dyn Activity;
 
-    // This is the type that will be stored in the Automaton and passed into the Mode::swap() function.
+    // This is the type that will be stored in the Automaton and passed into the Automaton::next() function.
     type Mode = Box<dyn Activity>;
-
-    // This is the type that will be passed into swap() for all Modes in this Family.
-    type Input = ();
-
-    // This is the type that will be returned by swap() for all Modes in this Family.
-    type Output = Box<dyn Activity>;
 }
 
 // This trait defines a common interface for all Modes in ActivityFamily.
 //
-trait Activity : boxed::Mode<Family = ActivityFamily> {
-    fn update(&mut self);
+trait Activity : Mode<Family = ActivityFamily> {
+    fn update(self : Box<Self>) -> Box<dyn Activity>;
 }
 
-// Each Mode in the state machine implements both Activity (the Base type) and boxed::Mode.
+// Each state in the state machine implements both Activity (the Base type) and Mode.
 //
 struct Working {
     pub hours_worked : u32,
 }
 
-impl Activity for Working {
-    fn update(&mut self) {
-        println!("Work, work, work...");
-        self.hours_worked += 1;
-    }
+impl Mode for Working {
+    type Family = ActivityFamily;
 }
 
-impl boxed::Mode for Working {
-    type Family = ActivityFamily;
-
-    // This function allows the current Mode to swap to another Mode, when ready.
+impl Activity for Working {
+    // This function updates the Mode and allows it to swap another one in as current, when ready.
     //
-    fn swap(self : Box<Self>, _input : ()) -> Box<dyn Activity> {
+    fn update(mut self : Box<Self>) -> Box<dyn Activity> {
+        println!("Work, work, work...");
+        self.hours_worked += 1;
+
         if self.hours_worked == 4 || self.hours_worked >= 8 {
             // To swap to another Mode, we can return a new, boxed Mode with the same signature as this one. Note that
             // because this function consumes the input Box<Self>, we can freely move state out of this Mode and into
@@ -67,17 +60,15 @@ struct Eating {
     pub calories_consumed : u32,
 }
 
-impl Activity for Eating {
-    fn update(&mut self) {
-        println!("Yum!");
-        self.calories_consumed += 100;
-    }
+impl Mode for Eating {
+    type Family = ActivityFamily;
 }
 
-impl boxed::Mode for Eating {
-    type Family = ActivityFamily;
+impl Activity for Eating {
+    fn update(mut self : Box<Self>) -> Box<dyn Activity> {
+        println!("Yum!");
+        self.calories_consumed += 100;
 
-    fn swap(self : Box<Self>, _input : ()) -> Box<dyn Activity> {
         if self.calories_consumed >= 500 {
             if self.hours_worked >= 8 {
                 println!("Time for bed!");
@@ -96,17 +87,15 @@ struct Sleeping {
     pub hours_rested : u32,
 }
 
-impl Activity for Sleeping {
-    fn update(&mut self) {
-        println!("ZzZzZzZz...");
-        self.hours_rested += 1;
-    }
+impl Mode for Sleeping {
+    type Family = ActivityFamily;
 }
 
-impl boxed::Mode for Sleeping {
-    type Family = ActivityFamily;
+impl Activity for Sleeping {
+    fn update(mut self : Box<Self>) -> Box<dyn Activity> {
+        println!("ZzZzZzZz...");
+        self.hours_rested += 1;
 
-    fn swap(self : Box<Self>, _input : ()) -> Box<dyn Activity> {
         if self.hours_rested >= 8 {
             println!("Time for breakfast!");
             Box::new(Eating { hours_worked: 0, calories_consumed: 0 })
@@ -119,11 +108,7 @@ fn main() {
     let mut person = ActivityFamily::automaton_with_mode(Box::new(Working { hours_worked: 0 }));
     
     for _age in 18..100 {
-        // Update the current Mode for the Automaton.
-        // NOTE: Using Deref coercion, we can call Activity::update() on the inner Mode through the Automaton itself.
-        person.update();
-
-        // Allow the Automaton to switch Modes.
-        Automaton::next(&mut person);
+        // Update the current Mode and/or transition to another Mode, when the current Mode requests it.
+        Automaton::next(&mut person, |current_mode| current_mode.update());
     }
 }

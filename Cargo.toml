@@ -1,6 +1,6 @@
 [package]
 name = "mode"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Andrew Thomas Christensen <andrew@andrewtc.com>"]
 edition = "2018"
 
@@ -11,7 +11,7 @@ repository = "https://github.com/andrewtc/mode"
 
 readme = "README.md"
 
-keywords = ["state", "machine", "behavior", "behavioral"]
+keywords = ["state", "machine", "finite", "FSM", "FSA", "behavior", "behavioral", "automaton", "automata"]
 categories = ["rust-patterns", "simulation", "data-structures"]
 
 license = "Apache-2.0 OR MIT"
