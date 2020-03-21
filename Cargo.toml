@@ -11,7 +11,7 @@ repository = "https://github.com/andrewtc/mode"
 
 readme = "README.md"
 
-keywords = ["state", "machine", "finite", "FSM", "FSA", "behavior", "behavioral", "automaton", "automata"]
+keywords = ["state", "machine", "finite", "behavioral", "automaton"]
 categories = ["rust-patterns", "simulation", "data-structures"]
 
 license = "Apache-2.0 OR MIT"
