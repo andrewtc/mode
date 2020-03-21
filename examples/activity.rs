@@ -6,9 +6,10 @@
 
 use mode::{Automaton, Family, Mode};
 
-// This meta-struct represents a group of all Modes that can be used with the same Automaton. By implementing Family,
-// we can specify common Base and Mode types for all Modes in this Family. The important thing to note is that this
-// struct will never be instantiated. It only exists to group a set of Modes together.
+// This meta-struct represents a group of all Modes that can be used with the same Automaton, i.e. all states in the
+// same state machine. By implementing Family, we can specify the common interface that will be exposed for all states
+// (type Base) and how the current state will be stored in the Automaton (type Mode). The important thing to note is
+// that this struct will never be instantiated. It only exists to group a set of states (Modes) together.
 // 
 struct ActivityFamily;
 

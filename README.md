@@ -30,8 +30,8 @@ See the full list of releases on [GitHub](https://github.com/andrewtc/mode/relea
 ## Upgrading to version `0.4`
 
 A lot has been streamlined in version `0.4`, in an effort to make `mode` even easier to understand and use. If you're
-interested in upgrading your project from version `^0.2` to `0.4` of `mode`, please see
-[UPGRADING-v0.4.md](UPGRADING-v0.4.md) for a step-by-step guide on how to update your code.
+interested in upgrading your project from version `0.3` to `0.4` of `mode`, please see
+[UPGRADING-v0.4.md](UPGRADING-v0.4.md) for a step-by-step guide.
 
 ## Documentation
 
@@ -42,9 +42,10 @@ Please see [docs.rs](https://docs.rs/mode) for detailed documentation.
 ```rust
 use mode::{Automaton, Family, Mode};
 
-// This meta-struct represents a group of all Modes that can be used with the same Automaton. By implementing Family,
-// we can specify common Base and Mode types for all Modes in this Family. The important thing to note is that this
-// struct will never be instantiated. It only exists to group a set of Modes together.
+// This meta-struct represents a group of all Modes that can be used with the same Automaton, i.e. all states in the
+// same state machine. By implementing Family, we can specify the common interface that will be exposed for all states
+// (type Base) and how the current state will be stored in the Automaton (type Mode). The important thing to note is
+// that this struct will never be instantiated. It only exists to group a set of states (Modes) together.
 // 
 struct ActivityFamily;
 
@@ -167,5 +168,5 @@ defined in the Apache-2.0 license, shall be dual licensed as above, without any 
 
 If you find bugs, please feel free to open an issue on [GitHub](https://github.com/andrewtc/mode/issues)! Otherwise, if
 you would like to propose changes to this library, feel free to send me a pull request or message me on the `mode`
-[Gitter channel](https://gitter.im/mode-rs/community?utm_source=share-link&utm_medium=link&utm_campaign=share-link), and
-I'll try to respond as quickly as I can.
+[Gitter channel](https://gitter.im/mode-rs/community?utm_source=share-link&utm_medium=link&utm_campaign=share-link).
+I'll try to respond to these requests as quickly as I can.
