@@ -200,12 +200,90 @@ impl<F> Automaton<F>
         }
     }
 
+    /// Calls `transition_fn` on the current `Mode` to determine whether it should transition out, swapping in whatever
+    /// `Mode` it returns as a result. Calling this function *may* change the current `Mode`, but not necessarily.
+    /// 
+    /// # Usage
+    /// ```
+    /// use mode::*;
+    /// 
+    /// struct SomeFamily;
+    /// impl Family for SomeFamily {
+    ///     type Base = State;
+    ///     type Mode = State;
+    /// }
+    /// 
+    /// #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    /// enum State { A, B, C }
+    /// impl Mode for State { type Family = SomeFamily; }
+    /// impl State {
+    ///     fn next(self) -> Self {
+    ///         match self {
+    ///             State::A => State::B,
+    ///             State::B => State::C,
+    ///             State::C => State::C, // Don't transition.
+    ///         }
+    ///     }
+    /// }
+    /// 
+    /// fn main() {
+    ///     let mut automaton = SomeFamily::automaton_with_mode(State::A);
+    ///     while *automaton != State::C {
+    ///         Automaton::next(&mut automaton, |current_mode| current_mode.next());
+    ///         println!("Now in state {:?}.", *automaton);
+    ///     }
+    /// }
+    /// ```
+    /// 
     pub fn next<T>(automaton : &mut Self, transition_fn : T)
         where T : FnOnce(F::Mode) -> F::Mode
     {
         Self::next_with_result(automaton, |mode| (transition_fn(mode), ()))
     }
 
+    /// Calls `transition_fn` on the current `Mode` to determine whether it should transition out, swapping in whatever
+    /// `Mode` it returns as a result. Calling this function *may* change the current `Mode`, but not necessarily.
+    /// 
+    /// Unlike [`next()`](struct.Automaton.html#method.next), the `transition_fn` returns a tuple containing the new
+    /// `Mode` to transition in as well as a return value in the second parameter. The second parameter will be returned
+    /// from this function after the new `Mode` is transitioned in. This is useful for things like error handling and
+    /// allowing the calling code to sense transitions between states.
+    /// 
+    /// # Usage
+    /// ```
+    /// use mode::*;
+    /// 
+    /// struct SomeFamily;
+    /// impl Family for SomeFamily {
+    ///     type Base = State;
+    ///     type Mode = State;
+    /// }
+    /// 
+    /// #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    /// enum State { A, B, C }
+    /// impl Mode for State { type Family = SomeFamily; }
+    /// impl State {
+    ///     fn next(self) -> (Self, Self) {
+    ///         match self {
+    ///             State::A => (State::B, self),
+    ///             State::B => (State::C, self),
+    ///             State::C => (State::C, self), // Don't transition.
+    ///         }
+    ///     }
+    /// }
+    /// 
+    /// fn main() {
+    ///     let mut automaton = SomeFamily::automaton_with_mode(State::A);
+    ///     while *automaton != State::C {
+    ///         let previous = Automaton::next_with_result(&mut automaton, |current_mode| current_mode.next());
+    ///         if previous != *automaton {
+    ///             println!("Switched from state {:?} to state {:?}.", previous, *automaton);
+    ///         }
+    ///         println!("Now in state {:?}.", *automaton);
+    ///     }
+    /// }
+    /// ```
+    /// 
     pub fn next_with_result<T, R>(automaton : &mut Self, transition_fn : T) -> R
         where T : FnOnce(F::Mode) -> (F::Mode, R)
     {
