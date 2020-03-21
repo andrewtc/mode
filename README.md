@@ -2,26 +2,38 @@
 [![Build Status](https://travis-ci.com/andrewtc/mode.svg?branch=master)](https://travis-ci.com/andrewtc/mode)
 [![Gitter](https://badges.gitter.im/mode-rs/community.svg)](https://gitter.im/mode-rs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
-A simple and effective state machine library, written in in idiomatic, 100% safe, stable Rust code.
+A simple and effective state machine library, written in idiomatic Rust.
+
+## What is `mode`?
+This library provides three main types, `Automaton`, `Mode`, and `Family`, that facilitate the creation of finite state
+machines. An `Automaton` can be used to quickly create a state machine over a `Family` of states, where each state is an
+object that implements the `Mode` trait.
 
 ## Features
-
-This library provides three main types, `Automaton`, `Mode`, and `Family`, that facilitate the creation of finite state
-machines. An `Automaton` can be used to quickly create a state machine over a `Family` of states, represented by objects
-that implement the `Mode` trait. The `Automaton` allows function calls to be dispatched to the current `Mode` via
-`Deref` coercion, and a flexible transition system provides a way to swap to a different `Mode` in the state machine,
-with the option to steal state from the previous `Mode`. This can help prevent spikes in memory usage when transitioning
-between `Mode`s that contain large amounts of data.
+ - `mode` supports creating several different kinds of state machine:
+    1. Simple state machines, where each state is a separate `enum` value and transitions are handled externally.
+    2. More complex state machines, where each state is a separate `struct` that implements some common `dyn Trait`, and
+       the responsibility for transitioning to the next `Mode` is delegated to the current `Mode` implementation.
+    3. Data-driven state machines, where all states are represented by the same concrete type with different input.
+ - Function calls can be dispatched to the current `Mode` easily through the containing `Automaton`, via `Deref`
+   coercion.
+ - You have total control over which public interface is exposed for the current `Mode` outside of the `Automaton`.
+ - A flexible transition system allows the next `Mode` in the state machine to steal state from the previous `Mode` when
+   it transitions in.
+ - `Mode`s can be stored in-place or heap-allocated, i.e. stored in a `Box<T>`, `Rc<T>`, or `Arc<T>`.
+ - The library itself uses **zero** allocations. Any and all allocations are controlled by you and passed into the
+   `Automaton`.
 
 ## Why use `mode`?
 
- - **Flexibility:** Create state machines that switch between `enum` values in-place, or organize each state into a
-   separate `struct`. Create states with explicit lifetimes and references, or which copy around everything they need.
-   This library imposes very few restrictions on how you write and organize your code.
- - **Well-documented code:** All public types have detailed documentation and examples, so getting up to speed is easy.
- - **Easy-to-digest internals:** Barring examples, the whole library clocks in at just over 1,000 lines of pure Rust, so
-   digging into the internals to figure out how it works does not require a huge time investment. No macro magic, no
-   auto-`impl`s. Just `trait`s, `struct`s, and generics.
+ - **It's flexible.** This library imposes very few restrictions on how you write and organize your code. All lifetimes,
+   allocations, and conventions are in your total control.
+ - **It's well-documented.** All public types have detailed documentation and examples, so getting up to speed is easy.
+ - **It's easy to digest.** Barring examples and comments, the whole library clocks in at less than 200 lines of code.
+   That means digging into the internals of `mode` to figure out how something works is effortless.
+ - **It's pure Rust.** No macro magic. No convoluted attribute markup. Just `trait`s, `struct`s, and generics.
+ - **100% safe, 100% stable.** There are zero `unsafe` blocks in this library, and no features that require the
+   `nightly` toolchain. That means `mode` is dependable and robust.
 
 ## Releases
 
