@@ -5,7 +5,7 @@
 // modified, or distributed except according to those terms.
 
 use crate::Family;
-use std::{rc::Rc, sync::Arc};
+use std::ops::Deref;
 
 /// Trait that defines a state within some `Family`, and can be made active in an `Automaton`.
 /// 
@@ -141,32 +141,14 @@ pub trait Mode {
     type Family : Family + ?Sized;
 }
 
-/// Blanket `impl` that allows a `Box<T : Mode>` to be used as the `Mode` associated `type` for a `Family`.
+/// Blanket `impl` that allows `Mode` pointer types, such as `Box<T : Mode>`, to be used as the `Mode` associated `type`
+/// for a `Family`.
 /// 
-impl<T, F> Mode for Box<T>
+impl<T, F, M> Mode for T
     where
-        F : Family + ?Sized,
-        T : Mode<Family = F> + ?Sized,
-{
-    type Family = F;
-}
-
-/// Blanket `impl` that allows an `Rc<T : Mode>` to be used as the `Mode` associated `type` for a `Family`.
-/// 
-impl<T, F> Mode for Rc<T>
-    where
-        F : Family + ?Sized,
-        T : Mode<Family = F> + ?Sized,
-{
-    type Family = F;
-}
-
-/// Blanket `impl` that allows an `Arc<T : Mode>` to be used as the `Mode` associated `type` for a `Family`.
-/// 
-impl<T, F> Mode for Arc<T>
-    where
-        F : Family + ?Sized,
-        T : Mode<Family = F> + ?Sized,
+        T : Deref<Target = M>,
+        F : Family<Mode = T> + ?Sized,
+        M : Mode<Family = F> + ?Sized,
 {
     type Family = F;
 }
