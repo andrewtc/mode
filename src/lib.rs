@@ -41,8 +41,6 @@
 //! 
 mod automaton;
 mod family;
-mod mode;
 
 pub use self::automaton::*;
 pub use self::family::*;
-pub use self::mode::*;

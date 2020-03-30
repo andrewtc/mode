@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use mode::{Automaton, Family, Mode};
+use mode::{Automaton, Family};
 
 const HEAD : u16 = 8;
 const MASK : u16 = 1 << HEAD;
@@ -24,10 +24,6 @@ enum ShiftOp { Left,  Right }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum State { A, B, C, D, E, H }
-
-impl Mode for State {
-    type Family = StateFamily;
-}
 
 fn step(state : State, tape : &mut u16) -> (State, bool) {
     use State::*;

@@ -7,7 +7,7 @@
 // NOTE: This example is the same as the "Activity" example (examples/activity.rs), except that it uses a concrete type
 // (an enum) to represent all states of the Automaton, as opposed to using a separate struct for each state.
 
-use mode::{Automaton, Family, Mode};
+use mode::{Automaton, Family};
 
 struct ActivityFamily;
 
@@ -21,10 +21,6 @@ enum Activity {
     Working { hours_worked : u32 },
     Eating { hours_worked : u32, calories_consumed : u32 },
     Sleeping { hours_rested : u32 },
-}
-
-impl Mode for Activity {
-    type Family = ActivityFamily;
 }
 
 impl Activity {

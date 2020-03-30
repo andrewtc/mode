@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::{Automaton, Mode};
+use crate::{Automaton};
 
 /// A meta-`trait` defining the common `Base` type and `Mode` storage conventions used by a related group of `Mode`
 /// implementations. `Mode`s can **only** transition to other `Mode`s within the same `Family`, i.e. where both `Mode`s
@@ -30,13 +30,9 @@ use crate::{Automaton, Mode};
 /// 
 /// ## A `Family` where `Base` is a concrete type
 /// ```
-/// use mode::{Family, Mode};
+/// use mode::Family;
 /// 
 /// enum SomeMode { A, B, C }
-/// 
-/// impl Mode for SomeMode {
-///     type Family = SomeFamily;
-/// }
 /// 
 /// impl SomeMode {
 ///     pub fn swap(self) -> Self {
@@ -58,9 +54,9 @@ use crate::{Automaton, Mode};
 /// 
 /// ## A `Family` where `Base` is a `dyn Trait`
 /// ```
-/// use mode::{Mode, Family};
+/// use mode::Family;
 /// 
-/// trait SomeTrait : Mode<Family = SomeFamily> {
+/// trait SomeTrait {
 ///     // ...
 /// }
 /// 
@@ -87,7 +83,7 @@ pub trait Family {
     /// the other hand, if `Self::Base` is a `dyn Trait`, this should usually be set to some pointer type capable of
     /// storing `Self::Base`, e.g. `Box<Self::Base>` or `Rc<Self::Base>`.
     /// 
-    type Mode : Mode<Family = Self>;
+    type Mode;
 
     /// Convenience function allowing an `Automaton` to be created for this `Family` type. Note that this is shorthand
     /// for `Automaton::new()`, and therefore `Self::Mode` *must* implement `Default`. See
@@ -104,10 +100,6 @@ pub trait Family {
     /// # }
     /// 
     /// struct ModeWithDefault { count : u32 };
-    /// 
-    /// impl Mode for ModeWithDefault {
-    ///     type Family = SomeFamily;
-    /// }
     /// 
     /// impl Default for ModeWithDefault {
     ///     fn default() -> Self {
@@ -140,10 +132,6 @@ pub trait Family {
     /// }
     /// 
     /// enum SomeMode { A, B, C };
-    /// 
-    /// impl Mode for SomeMode {
-    ///     type Family = SomeFamily;
-    /// }
     /// 
     /// // Create an Automaton with A as the initial Mode.
     /// let mut automaton = SomeFamily::automaton_with_mode(SomeMode::A);

@@ -31,7 +31,7 @@ use std::ops::{Deref, DerefMut};
 /// #     type Mode = Box<dyn MyBase>;
 /// # }
 /// #
-/// # trait MyBase : Mode<Family = SomeFamily> {
+/// # trait MyBase {
 /// #     fn some_fn(&self);
 /// #     fn some_mut_fn(&mut self);
 /// #     fn some_transition_fn(self : Box<Self>) -> Box<dyn MyBase>;
@@ -43,10 +43,6 @@ use std::ops::{Deref, DerefMut};
 /// #     fn some_fn(&self) { println!("some_fn was called"); }
 /// #     fn some_mut_fn(&mut self) { println!("some_mut_fn was called"); }
 /// #     fn some_transition_fn(self : Box<Self>) -> Box<dyn MyBase> { self }
-/// # }
-/// # 
-/// # impl Mode for SomeMode {
-/// #     type Family = SomeFamily;
 /// # }
 /// 
 /// // Use with_mode() to create the Automaton with an initial state.
@@ -105,10 +101,6 @@ use std::ops::{Deref, DerefMut};
 ///     fn default() -> Self { Self { data : [0; DATA_SIZE] } }
 /// }
 /// 
-/// impl Mode for ReallyBigMode {
-///     type Family = ReallyBigFamily;
-/// }
-/// 
 /// fn main() {
 ///     let mut automaton = ReallyBigFamily::automaton();
 /// 
@@ -138,10 +130,6 @@ use std::ops::{Deref, DerefMut};
 /// 
 /// impl Default for ReallyBigMode {
 ///     fn default() -> Self { Self { data : [0; DATA_SIZE] } }
-/// }
-/// 
-/// impl Mode for ReallyBigMode {
-///     type Family = ReallyBigFamily;
 /// }
 /// 
 /// fn main() {
@@ -185,9 +173,6 @@ impl<F> Automaton<F>
     /// }
     /// 
     /// enum SomeMode { A, B, C };
-    /// impl Mode for SomeMode {
-    ///     type Family = SomeFamily;
-    /// }
     /// 
     /// // Create an Automaton with A as the initial Mode.
     /// // NOTE: We could alternatively use SomeFamily::automaton_with_mode() here to shorten this.
@@ -215,7 +200,6 @@ impl<F> Automaton<F>
     /// 
     /// #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     /// enum State { A, B, C }
-    /// impl Mode for State { type Family = SomeFamily; }
     /// impl State {
     ///     fn next(self) -> Self {
     ///         match self {
@@ -261,7 +245,6 @@ impl<F> Automaton<F>
     /// 
     /// #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     /// enum State { A, B, C }
-    /// impl Mode for State { type Family = SomeFamily; }
     /// impl State {
     ///     fn next(self) -> (Self, Self) {
     ///         match self {
@@ -422,10 +405,6 @@ impl<F> Automaton<F>
     ///     }
     /// }
     /// 
-    /// impl Mode for ModeWithDefault {
-    ///     type Family = SomeFamily;
-    /// }
-    /// 
     /// impl Default for ModeWithDefault {
     ///     fn default() -> Self {
     ///         ModeWithDefault { count: 0 }
@@ -480,7 +459,7 @@ impl<F> Default for Automaton<F>
 ///     type Mode = Box<dyn MyBase>;
 /// }
 /// 
-/// trait MyBase : Mode<Family = MyFamily> + Debug { } // TODO: Add common interface.
+/// trait MyBase : Debug { } // TODO: Add common interface.
 /// 
 /// #[derive(Debug)]
 /// struct MyMode {
@@ -489,10 +468,6 @@ impl<F> Default for Automaton<F>
 /// }
 /// 
 /// impl MyBase for MyMode { } // TODO: Implement common interface.
-/// 
-/// impl Mode for MyMode {
-///     type Family = MyFamily;
-/// }
 /// 
 /// let automaton = MyFamily::automaton_with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));
 /// dbg!(automaton);
@@ -524,7 +499,7 @@ impl<F> fmt::Debug for Automaton<F>
 ///     type Mode = Box<dyn MyBase>;
 /// }
 /// 
-/// trait MyBase : Mode<Family = MyFamily> + Display { } // TODO: Add common interface.
+/// trait MyBase : Display { } // TODO: Add common interface.
 /// 
 /// struct MyMode {
 ///     pub foo : i32,
@@ -538,10 +513,6 @@ impl<F> fmt::Debug for Automaton<F>
 /// }
 /// 
 /// impl MyBase for MyMode { } // TODO: Implement common interface.
-/// 
-/// impl Mode for MyMode {
-///     type Family = MyFamily;
-/// }
 /// 
 /// let automaton = MyFamily::automaton_with_mode(Box::new(MyMode { foo: 3, bar: "Hello, World!" }));
 /// println!("{}", automaton);

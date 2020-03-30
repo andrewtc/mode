@@ -4,7 +4,7 @@
 // MIT license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your option. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use mode::{Automaton, Family, Mode};
+use mode::{Automaton, Family};
 
 // This meta-struct represents a group of all Modes that can be used with the same Automaton, i.e. all states in the
 // same state machine. By implementing Family, we can specify the common interface that will be exposed for all states
@@ -23,7 +23,7 @@ impl Family for ActivityFamily {
 
 // This trait defines a common interface for all Modes in ActivityFamily.
 //
-trait Activity : Mode<Family = ActivityFamily> {
+trait Activity {
     fn update(self : Box<Self>) -> Box<dyn Activity>;
 }
 
@@ -31,10 +31,6 @@ trait Activity : Mode<Family = ActivityFamily> {
 //
 struct Working {
     pub hours_worked : u32,
-}
-
-impl Mode for Working {
-    type Family = ActivityFamily;
 }
 
 impl Activity for Working {
@@ -60,10 +56,6 @@ struct Eating {
     pub calories_consumed : u32,
 }
 
-impl Mode for Eating {
-    type Family = ActivityFamily;
-}
-
 impl Activity for Eating {
     fn update(mut self : Box<Self>) -> Box<dyn Activity> {
         println!("Yum!");
@@ -85,10 +77,6 @@ impl Activity for Eating {
 
 struct Sleeping {
     pub hours_rested : u32,
-}
-
-impl Mode for Sleeping {
-    type Family = ActivityFamily;
 }
 
 impl Activity for Sleeping {
