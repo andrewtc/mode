@@ -1,4 +1,4 @@
-![#mode](mode-logo.png)
+![#mode](mode-logo.svg)
 [![Build Status](https://travis-ci.com/andrewtc/mode.svg?branch=master)](https://travis-ci.com/andrewtc/mode)
 [![Gitter](https://badges.gitter.im/mode-rs/community.svg)](https://gitter.im/mode-rs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
