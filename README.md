@@ -1,6 +1,8 @@
-![#mode](mode-logo.svg)
-[![Build Status](https://travis-ci.com/andrewtc/mode.svg?branch=master)](https://travis-ci.com/andrewtc/mode)
+<img src="mode-logo.svg" alt="mode" style="display: block; width: 25em; margin: 0 0 1em;">
+
+[![Build Status](https://github.com/andrewtc/mode/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/andrewtc/mode/actions/workflows/rust.yml?branch=master)
 [![Gitter](https://badges.gitter.im/mode-rs/community.svg)](https://gitter.im/mode-rs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Docs](https://docs.rs/mode/badge.svg)](https://docs.rs/mode)
 
 A simple and effective state machine library, written in idiomatic Rust.
 
