@@ -1,8 +1,8 @@
 <img src="mode-logo.svg" alt="mode" style="display: block; width: 25em; margin: 0 0 1em;">
 
 [![Build Status](https://github.com/andrewtc/mode/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/andrewtc/mode/actions/workflows/rust.yml?branch=master)
-[![Gitter](https://badges.gitter.im/mode-rs/community.svg)](https://gitter.im/mode-rs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Docs](https://docs.rs/mode/badge.svg)](https://docs.rs/mode)
+[![Discord](https://img.shields.io/discord/1408632789347336316?logo=discord)](https://discord.gg/QyWYW6WB)
 
 A simple and effective state machine library, written in idiomatic Rust.
 
@@ -181,6 +181,5 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
 
 If you find bugs, please feel free to open an issue on [GitHub](https://github.com/andrewtc/mode/issues)! Otherwise, if
-you would like to propose changes to this library, feel free to send me a pull request or message me on the `mode`
-[Gitter channel](https://gitter.im/mode-rs/community?utm_source=share-link&utm_medium=link&utm_campaign=share-link).
-I'll try to respond to these requests as quickly as I can.
+you would like to propose changes to this library, feel free to send me a pull request or message me on the 
+[`andrewtc` Discord server](https://discord.gg/QyWYW6WB). I'll try to respond to these requests as quickly as I can.
